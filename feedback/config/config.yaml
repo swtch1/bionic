@@ -1,0 +1,33 @@
+# App config for the meeting feedback app (v0).
+# Model IDs are current as of this build - do not "correct" to older 3.x IDs.
+
+models:
+  gate: "claude-haiku-4-5-20251001"      # model 1: cheap, no tools, forced JSON
+  responder: "claude-sonnet-5"           # model 2: tooled, precision
+
+tailer:
+  poll_interval_seconds: 0.1             # 100ms fstat poll (not kqueue/watchdog)
+
+window:
+  window_size: 10                        # last N turns of context (Decision 4)
+
+anti_spam:
+  cooldown_seconds: 25.0                 # global cooldown between responder launches
+  responses_per_min: 4                   # hard cap
+  recently_addressed_size: 8             # claims the gate should skip
+
+hygiene:
+  short_me_max_seconds: 0.5
+  bleed_delta_t_seconds: 0.75
+  bleed_similarity: 0.9
+  no_other_warn_seconds: 120.0           # FLAG, never drop (Decision 3) - no drop toggle exists
+
+# Per-type glanceability ceilings, asserted in evals. "Every word must be earned."
+# These are enforced as a CODE-LEVEL post-check on responder output, not just
+# requested in the prompt.
+glanceability:
+  answer:            {max_words: 45, max_lines: 4}
+  correction:        {max_words: 55, max_lines: 5}
+  enrichment:        {max_words: 40, max_lines: 4}
+  abstraction-guard: {max_words: 25, max_lines: 2}
+  concept-explainer: {max_words: 70, max_lines: 6}

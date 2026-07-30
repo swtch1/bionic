@@ -1,0 +1,34 @@
+# Resource registry (Decision 10). PLACEHOLDER entries - the user explicitly
+# said to invent these; he will edit paths to real repos/docs later.
+#
+# Gate sees only {name, desc} (cheap, no tools) to judge in-scope-ness.
+# Responder gets {path} to actually read/grep. NO vector DB in v0.
+
+resources:
+  - name: auth-service
+    kind: repo
+    path: ./placeholder/auth-service
+    desc: >
+      Authentication service. Owns login, session issuance, and token refresh.
+      Python. Talks to the identity Postgres. Publishes auth events.
+
+  - name: billing-service
+    kind: repo
+    path: ./placeholder/billing-service
+    desc: >
+      Billing and invoicing service. Python, uses shared pydantic models.
+      Publishes to the events topic rather than writing Postgres directly.
+
+  - name: platform-docs
+    kind: docs
+    path: ./placeholder/platform-docs
+    desc: >
+      Architecture decision records and runbooks for the platform. Covers
+      service ownership boundaries, the cutover/rollback playbook, and on-call.
+
+  - name: gateway
+    kind: repo
+    path: ./placeholder/gateway
+    desc: >
+      Edge API gateway. Routing, rate limiting, and request auth verification.
+      Does NOT own token refresh - it delegates to auth-service.
