@@ -119,15 +119,12 @@ needs to be earned."
 - Orchestrator evaluates the gate **once per burst tick**; cooldown suppresses a
   second response.
 
-**Wired, NOT verified** (no `ANTHROPIC_API_KEY` in this build):
-- The live gate call (`AnthropicGateClient`, raw Anthropic API,
-  `output_config.format`).
-- The live responder (`responder_live.py`, `claude-agent-sdk`). The
-  structured-output-alongside-tools ergonomics of `claude-agent-sdk` are outside
-  the vendored `claude-api` reference and were not exercised. The interface uses
-  a **terminal `emit_feedback` tool call** so it does not depend on forced-JSON-
-  with-tools working - but the SDK wiring in `responder_live.py` is the one spot
-  to verify against the installed SDK version before trusting the live path.
+**Verified by running against the real API** (`make run-live`, 2026-07-29):
+the live gate call (`AnthropicGateClient`) and the live responder
+(`responder_live.py`, `claude-agent-sdk`) both ran end-to-end against a real
+transcript with no crash - config-path warnings, gate, and responder wiring
+all fired correctly. Not yet verified: the *quality* of gate recall / responder
+precision on a live, multi-minute call - only that the plumbing works.
 
 ## Dependencies (exactly four, Decision 16)
 
