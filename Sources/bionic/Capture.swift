@@ -104,7 +104,10 @@ final class MicCapture: @unchecked Sendable {
         guard let continuation else { return } // set by start() before this is ever called
         let converter = self.converter
 
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
+        // safeInstallTap, not installTap: AVFoundation RAISES on a format mismatch rather than
+        // returning an error, and `format` was read from the hardware a few statements ago - a
+        // device change in that window makes it stale. See SafeInstallTap.swift.
+        try input.safeInstallTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
             guard let samples = try? converter.resampleBuffer(buffer), !samples.isEmpty else { return }
             continuation.yield(RawAudioChunk(samples: samples, epochTime: Date().timeIntervalSince1970))
         }

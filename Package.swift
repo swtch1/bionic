@@ -8,9 +8,15 @@ let package = Package(
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.12.4")
     ],
     targets: [
+        // Obj-C shim so Swift can survive AVFoundation's NSException-raising APIs.
+        // See Sources/CExceptionCatcher/include/CExceptionCatcher.h for why this exists.
+        .target(name: "CExceptionCatcher"),
         .executableTarget(
             name: "bionic",
-            dependencies: [.product(name: "FluidAudio", package: "FluidAudio")]
+            dependencies: [
+                .product(name: "FluidAudio", package: "FluidAudio"),
+                "CExceptionCatcher",
+            ]
         )
     ]
 )
