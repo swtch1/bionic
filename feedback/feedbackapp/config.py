@@ -52,7 +52,15 @@ class AppConfig:
         )
 
 
-CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+# The user's live config - what load_config() reads by default. Lives outside
+# the repo (Decision: 2026-07-29) so a `git pull` never clobbers a user's
+# edited resources.yaml, and so the same config is shared by every checkout.
+CONFIG_DIR = Path.home() / ".config" / "bionic"
+
+# The bundled starter templates `init_config()` copies from. Distinct from
+# CONFIG_DIR: this one ships in the repo and must never be treated as the
+# live config (see the resources.yaml PLACEHOLDER comment in this directory).
+DEFAULTS_DIR = Path(__file__).resolve().parent.parent / "config"
 
 
 class ConfigError(Exception):
@@ -65,16 +73,88 @@ class ConfigError(Exception):
     """
 
 
+def init_config(target_dir: Path | None = None, defaults_dir: Path | None = None) -> list[Path]:
+    """Create target_dir with starter config files, if they don't already exist.
+
+    Never overwrites a file that's already there - re-running `init` after
+    editing resources.yaml must not clobber those edits. Returns the paths it
+    actually created (empty list if everything already existed).
+    """
+    d = target_dir or CONFIG_DIR
+    defaults = defaults_dir or DEFAULTS_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    transcripts_dir = d / "transcripts"
+    transcripts_dir.mkdir(exist_ok=True)
+
+    created: list[Path] = []
+    for name in ("config.yaml", "instructions.md"):
+        dest = d / name
+        if not dest.exists():
+            dest.write_text((defaults / name).read_text())
+            created.append(dest)
+
+    resources_dest = d / "resources.yaml"
+    if not resources_dest.exists():
+        resources_dest.write_text(_starter_resources_yaml(transcripts_dir))
+        created.append(resources_dest)
+
+    return created
+
+
+def _starter_resources_yaml(transcripts_dir: Path) -> str:
+    return f"""\
+# Resource registry (Decision 10). Point these at your own repos and docs -
+# uncomment and edit the examples below, or add your own in the same shape.
+#
+# Gate sees only {{name, desc}} (cheap, no tools) to judge in-scope-ness.
+# Responder gets {{path}} to actually read/grep. NO vector DB in v0.
+
+resources:
+  # - name: auth-service
+  #   kind: repo
+  #   path: ~/code/auth-service
+  #   desc: >
+  #     Authentication service. Owns login, session issuance, and token
+  #     refresh.
+
+  # - name: platform-docs
+  #   kind: docs
+  #   path: ~/docs/platform
+  #   desc: >
+  #     Architecture decision records and runbooks - service ownership,
+  #     the cutover/rollback playbook, on-call.
+
+  # - name: gateway
+  #   kind: repo
+  #   path: ~/code/gateway
+  #   desc: >
+  #     Edge API gateway. Routing, rate limiting, request auth verification.
+
+  - name: past-meetings
+    kind: transcripts
+    path: {transcripts_dir}
+    desc: >
+      Diarized transcripts of past meetings, one JSONL file per meeting,
+      named YYYY-MM-DD-HH-MM-SS-<short-description>.jsonl. Read these to
+      recall what was discussed or decided in an earlier conversation.
+"""
+
+
 def load_config(config_dir: Path | None = None) -> AppConfig:
     d = config_dir or CONFIG_DIR
+    if not d.exists():
+        raise ConfigError(
+            f"config directory not found: {d}\n"
+            "Run `make init` (or `python -m feedbackapp init`) to create it."
+        )
     try:
         return _load(d)
     except ConfigError:
         raise
     except FileNotFoundError as e:
         raise ConfigError(
-            f"config file not found: {e.filename} (expected the config/ directory next "
-            f"to the feedbackapp package, at {d})"
+            f"config file not found: {e.filename} (expected {d} - run `make init` "
+            "if this directory is missing files)"
         ) from e
     except yaml.YAMLError as e:
         raise ConfigError(f"invalid YAML under {d}: {e}") from e

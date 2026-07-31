@@ -11,7 +11,7 @@ from functools import partial
 import pytest
 from conftest import build_orchestrator, jsonl_line, make_turn
 
-from feedbackapp.config import CONFIG_DIR, ConfigError, load_config
+from feedbackapp.config import DEFAULTS_DIR, ConfigError, load_config
 from feedbackapp.hygiene import Hygiene, HygieneConfig, _similarity
 from feedbackapp.renderer import _clock
 from feedbackapp.tailer import Tailer
@@ -66,7 +66,7 @@ def test_missing_config_dir_raises_a_named_error(tmp_path):
 
 
 def test_malformed_resource_entry_names_the_file(tmp_path):
-    src = CONFIG_DIR
+    src = DEFAULTS_DIR
     for f in ("config.yaml", "instructions.md"):
         (tmp_path / f).write_text((src / f).read_text())
     (tmp_path / "resources.yaml").write_text("resources:\n  - name: r\n    kind: repo\n")

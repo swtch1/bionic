@@ -14,12 +14,18 @@ ARGS ?=
 # needed because command-line variables outrank plain assignments.
 override TRANSCRIPT := $(patsubst ~/%,$(HOME)/%,$(TRANSCRIPT))
 
-.PHONY: setup test replay run run-live clean demo
+.PHONY: setup init test replay run run-live clean demo
 
 setup:
 	python3 -m venv $(VENV)
 	$(PIP) install -q --upgrade pip
 	$(PIP) install -q anthropic claude-agent-sdk pydantic pyyaml pytest
+
+# Create ~/.config/bionic (config.yaml, instructions.md, resources.yaml,
+# transcripts/) if it doesn't already exist. Safe to re-run - never
+# overwrites an existing file.
+init: setup
+	$(PY) -m feedbackapp init
 
 # Offline test suite - no API key required.
 test:

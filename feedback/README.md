@@ -34,6 +34,7 @@ replay/Swift --> transcript.jsonl --> tailer --> hygiene --> renderer
 
 ```sh
 make setup                                   # venv + the 4 deps
+make init                                    # creates ~/.config/bionic (config, resources.yaml)
 make test                                    # offline suite, no API key needed
 
 # Offline demo (two terminals, or background the first):
@@ -43,6 +44,9 @@ make replay FIXTURE=fixtures/wrong_fact.jsonl TRANSCRIPT=/tmp/live.jsonl MODE=tu
 
 The offline path (replay -> tailer -> hygiene -> renderer) runs with **no API
 key**. The LLM path is `make run-live` (needs `ANTHROPIC_API_KEY`).
+
+`make init` is safe to re-run - it never overwrites a file that's already
+there, so editing `resources.yaml` and re-running it later is a no-op.
 
 ## The hygiene layer (new in v0 - absent from architecture-v0)
 
@@ -66,14 +70,23 @@ Policy: **flag, don't drop** (the LLM wants the user's own turns, to catch his
 errors and rabbit-holing). Dropping is a config toggle, default off. The
 synthetic `attribution_suspect` flag is what reaches the gate.
 
-## Config (`config/`)
+## Config (`~/.config/bionic/`)
+
+Created by `make init` (or `python -m feedbackapp init`) from the templates in
+`feedback/config/` - that directory is the bundled starting point, not the
+live config; edits to it are never read at runtime.
 
 - `instructions.md` (+ optional `instructions.local.md` per-meeting overlay) -
   plain markdown; the gate reads intent, so no DSL.
-- `resources.yaml` - placeholder repos/docs. The gate sees names+descriptions
-  only (cheap, no tools); the responder gets paths to read/grep.
+- `resources.yaml` - starter repo/doc examples (commented out) plus one active
+  entry, `past-meetings`, pointing at `transcripts/`. The gate sees
+  names+descriptions only (cheap, no tools); the responder gets paths to
+  read/grep.
 - `config.yaml` - model IDs, cooldown/window/caps, hygiene thresholds, and the
   per-type glanceability ceilings.
+- `transcripts/` - where diarized meeting transcripts live, one JSONL file per
+  meeting, named `YYYY-MM-DD-HH-MM-SS-<short-description>.jsonl`. Registered as
+  a resource so the responder can look up what was discussed in a past meeting.
 
 ## Response types & glanceability
 

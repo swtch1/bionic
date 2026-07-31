@@ -1,5 +1,8 @@
 """CLI entry point. Wires the pipeline and runs the async loop.
 
+First run:
+    python -m feedbackapp init                            # creates ~/.config/bionic
+
 Offline path (no API key needed):
     python -m feedbackapp run --transcript /tmp/live.jsonl
 
@@ -18,7 +21,7 @@ import signal
 import sys
 from pathlib import Path
 
-from .config import ConfigError, load_config
+from .config import CONFIG_DIR, ConfigError, init_config, load_config
 from .gate import AnthropicGateClient, Gate
 from .hygiene import Hygiene
 from .orchestrator import Orchestrator
@@ -29,8 +32,8 @@ from .tailer import Tailer
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="feedbackapp")
-    ap.add_argument("command", choices=["run"], help="run the feedback app")
-    ap.add_argument("--transcript", type=Path, required=True, help="live JSONL to tail")
+    ap.add_argument("command", choices=["run", "init"], help="run the feedback app, or init its config")
+    ap.add_argument("--transcript", type=Path, help="live JSONL to tail (required for `run`)")
     ap.add_argument("--sidecar", type=Path, default=None, help="tailer resume sidecar")
     ap.add_argument("--live", action="store_true", help="enable gate+responder (needs ANTHROPIC_API_KEY)")
     ap.add_argument("--no-flags", action="store_true", help="hide hygiene flags in the stream")
@@ -39,6 +42,21 @@ def main(argv: list[str] | None = None) -> int:
         help="print the live transcript and per-tick trace (live mode is quiet by default)",
     )
     args = ap.parse_args(argv)
+
+    if args.command == "init":
+        created = init_config()
+        if created:
+            print(f"created {CONFIG_DIR}:")
+            for p in created:
+                print(f"  {p.name}")
+            print(f"edit {CONFIG_DIR / 'resources.yaml'} to point at your own repos and docs.")
+        else:
+            print(f"{CONFIG_DIR} already initialized - nothing to do.")
+        return 0
+
+    if not args.transcript:
+        print("ERROR: `run` requires --transcript", file=sys.stderr)
+        return 2
 
     try:
         config = load_config()
@@ -88,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
             renderer.notice(
                 f"warning: {len(missing)} configured resource path(s) do not exist "
                 f"({', '.join(missing[:3])}) - the responder cannot verify against them. "
-                "Edit config/resources.yaml."
+                f"Edit {CONFIG_DIR / 'resources.yaml'}."
             )
         renderer.notice(
             "live mode: gate=on, responder=on"

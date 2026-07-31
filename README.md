@@ -31,6 +31,14 @@ make release          # build
 make listen           # start capturing a call; Ctrl-C to stop
 ```
 
+Installing system-wide, or running the [feedback app](feedback/README.md) alongside it,
+needs a one-time config setup:
+
+```sh
+make install           # installs the bionic binary (PREFIX=/usr/local by default)
+make init               # creates ~/.config/bionic (config, resources.yaml, transcripts/)
+```
+
 `make help` lists every target.
 
 The first `make listen` will trigger two macOS permission prompts. **Grant both** - see

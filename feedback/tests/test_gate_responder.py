@@ -10,7 +10,7 @@ import pytest
 
 from conftest import StubGateClient, StubResponderClient, make_turn
 
-from feedbackapp.config import Resource, load_config
+from feedbackapp.config import DEFAULTS_DIR, Resource, load_config
 from feedbackapp.gate import Gate, build_gate_prompt
 from feedbackapp.hygiene import Hygiene
 from feedbackapp.models import GateDecision
@@ -58,7 +58,7 @@ def test_gate_empty_batch_never_calls_model():
 
 # The real ceilings, so a config/config.yaml edit cannot leave this asserting
 # stale numbers.
-CEILINGS = load_config().glanceability
+CEILINGS = load_config(DEFAULTS_DIR).glanceability
 
 
 def _responder(emitted):

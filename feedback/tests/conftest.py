@@ -9,7 +9,7 @@ from typing import Any, Optional
 # Make the package importable when running pytest from feedback/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from feedbackapp.config import Resource, load_config  # noqa: E402
+from feedbackapp.config import DEFAULTS_DIR, Resource, load_config  # noqa: E402
 from feedbackapp.gate import Gate  # noqa: E402
 from feedbackapp.hygiene import Hygiene  # noqa: E402
 from feedbackapp.orchestrator import Orchestrator  # noqa: E402
@@ -125,7 +125,7 @@ def build_orchestrator(tmp_path=None, *, gate_client=None, resp_client=None,
     config/config.yaml so a yaml edit cannot leave a test asserting stale
     numbers.
     """
-    config = load_config()
+    config = load_config(DEFAULTS_DIR)
     if poll_interval is not None:
         config.poll_interval_seconds = poll_interval
     if target is None:

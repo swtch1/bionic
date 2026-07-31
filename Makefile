@@ -65,7 +65,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-deps build release run listen record diarize review transcribe enroll test clean uninstall install fixture quality quality-bless
+.PHONY: help check-deps build release run listen record diarize review transcribe enroll test clean uninstall install init fixture quality quality-bless
 
 help: ## Show this help
 	@echo "bionic - live + offline meeting transcription to JSONL"
@@ -142,6 +142,10 @@ install: release ## Install the binary (PREFIX=/usr/local by default)
 	install -d "$(PREFIX)/bin"
 	install -m 0755 "$(RELEASE)" "$(PREFIX)/bin/$(BIN)"
 	@echo "installed $(PREFIX)/bin/$(BIN)"
+	@echo "run 'make init' to set up ~/.config/bionic before your first meeting"
+
+init: ## One-time setup: create ~/.config/bionic (config + transcripts dir)
+	@cd feedback && $(MAKE) init
 
 uninstall: ## Remove the installed binary
 	rm -f "$(PREFIX)/bin/$(BIN)"

@@ -1,5 +1,7 @@
-# Resource registry (Decision 10). PLACEHOLDER entries - the user explicitly
-# said to invent these; he will edit paths to real repos/docs later.
+# Resource registry (Decision 10). PLACEHOLDER entries used only for the test
+# suite (tests load DEFAULTS_DIR directly, see conftest.py). The file a real
+# user edits is ~/.config/bionic/resources.yaml, created by `make init` from
+# the starter template in feedbackapp/config.py - not this file.
 #
 # Gate sees only {name, desc} (cheap, no tools) to judge in-scope-ness.
 # Responder gets {path} to actually read/grep. NO vector DB in v0.
