@@ -123,6 +123,7 @@ test: build ## Run the automated self-tests
 	swift run $(BIN) --selftest-vadthrow
 	swift run $(BIN) --selftest-transcriptname
 	swift run $(BIN) --selftest-tapexception
+	swift run $(BIN) --selftest-permissions
 
 install: release ## Install the binary (PREFIX=/usr/local by default)
 	install -d "$(PREFIX)/bin"

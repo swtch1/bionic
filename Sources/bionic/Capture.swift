@@ -168,11 +168,14 @@ final class MicCapture: @unchecked Sendable {
 
 enum ListenError: Error, LocalizedError {
     case noDisplay
+    case screenRecordingDenied
     var errorDescription: String? {
         switch self {
         case .noDisplay:
             return "ScreenCaptureKit reported no displays - cannot capture system audio " +
-                "(no Screen Recording permission granted to this terminal app? no display attached?)."
+                "(no display attached?)."
+        case .screenRecordingDenied:
+            return ScreenRecordingPermission.remediation
         }
     }
 }
@@ -228,6 +231,12 @@ final class SystemAudioCapture: @unchecked Sendable {
     private var tap: SystemAudioTap?
 
     func start() async throws -> AsyncStream<RawAudioChunk> {
+        // Check BEFORE touching SCShareableContent: without the grant, `.current` blocks rather
+        // than erroring, which is the "hangs at Starting system-audio capture" failure users hit.
+        // Preflight answers instantly and never prompts. See PermissionHealth.swift.
+        guard ScreenRecordingPermission.isGranted() else {
+            throw ListenError.screenRecordingDenied
+        }
         let content = try await SCShareableContent.current
         guard let display = content.displays.first else {
             throw ListenError.noDisplay

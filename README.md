@@ -47,12 +47,21 @@ rebuilds, but switching terminal apps means granting again.
 | Microphone | Privacy & Security -> Microphone | the `me` stream |
 | Screen Recording | Privacy & Security -> Screen & System Audio Recording | the `other` stream |
 
-Screen Recording is required because macOS exposes system audio capture only through
-ScreenCaptureKit. No video is ever recorded: the stream is pinned to a 2x2 surface at
-1 fps and no video output handler is registered.
+Screen Recording is required because we capture system audio via ScreenCaptureKit. No video
+is ever recorded: the stream is pinned to a 2x2 surface at 1 fps and no video output handler
+is registered.
 
-If `listen` hangs at "Starting system-audio capture", Screen Recording is not granted -
-grant it, then fully quit and reopen the terminal app (the grant is read at launch).
+This permission is an artifact of that implementation choice, not a macOS requirement.
+CoreAudio's process-tap API (`CATapDescription`, macOS 14.2+) captures per-application audio
+under Audio Capture consent alone, with no Screen Recording grant. Moving to it would drop
+this permission entirely and let us tap a specific meeting app instead of the whole output
+mix. Not yet done - tracked as a known improvement.
+
+If Screen Recording is missing, `listen` now fails immediately with instructions rather than
+hanging at "Starting system-audio capture" (`CGPreflightScreenCaptureAccess` is checked before
+ScreenCaptureKit is touched, since `SCShareableContent.current` blocks instead of erroring when
+the grant is absent). Grant it, then fully quit and reopen the terminal app - the grant is read
+at launch.
 
 ## Usage
 

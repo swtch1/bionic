@@ -585,6 +585,8 @@ if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "enroll" {
     runBlocking(runSelfTestTranscriptName)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-tapexception" {
     runBlocking(runSelfTestTapException)
+} else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-permissions" {
+    runBlocking(runSelfTestPermissions)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "repair-wav" {
     runBlocking(runRepairWav)
 } else {

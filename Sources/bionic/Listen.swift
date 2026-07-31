@@ -145,6 +145,16 @@ func runListen() async throws {
         }
     }
 
+    // Check permissions BEFORE opening any capture. Both failures are otherwise near-invisible: a
+    // missing Screen Recording grant makes ScreenCaptureKit hang rather than error, and a broken
+    // mic yields a transcript with no "me" turns, which reads exactly like a quiet meeting.
+    // Warn rather than exit for the mic: a system-audio-only recording is still useful, and it is
+    // not this command's place to decide that a half-capture is worthless.
+    if let micWarning = MicrophonePermission.message(for: MicrophonePermission.check()) {
+        printBoxedWarning(micWarning.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { "# \($0)" })
+    }
+
     err("Starting microphone capture ('me')...")
     let mic = MicCapture()
     var micStream = try mic.start()
