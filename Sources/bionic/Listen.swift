@@ -25,10 +25,17 @@ import FluidAudio
 // headphones so the mic physically cannot pick up the call's own output. This is a real,
 // disclosed limitation of the live path, not a solved problem.
 func runListen() async throws {
-    // MARK: CLI parsing - listen [--out <path>] [--append] [--record <session-dir>]. Same flag
-    // shapes as the batch path. --record is OPT-IN ONLY (never a default): it retains raw meeting
-    // audio to disk, which is private, so nothing is written unless the operator asks by name.
-    var outPath = "transcript.jsonl"
+    // MARK: CLI parsing - listen [--out <path>] [--title <desc>] [--append] [--record <session-dir>].
+    // Same flag shapes as the batch path. --record is OPT-IN ONLY (never a default): it retains raw
+    // meeting audio to disk, which is private, so nothing is written unless the operator asks by name.
+    //
+    // --out is now OPTIONAL: with no --out, the transcript is auto-named into the shared transcripts
+    // directory (~/.config/bionic/transcripts, the same one feedbackapp's config points the responder
+    // at) as `YYYY-MM-DD-HH-MM-SS-<title-slug>.jsonl` - so a meeting run without --out is still
+    // discoverable later, and the responder can look it up by date. --title supplies the short
+    // description; it defaults to "meeting" when the operator doesn't name the call up front.
+    var outPath: String?
+    var title = "meeting"
     var appendFlag = false
     var recordDir: String?
     var i = 2 // args[0] = binary, args[1] = "listen"
@@ -37,14 +44,16 @@ func runListen() async throws {
     while i < args.count {
         switch args[i] {
         case "--out": outPath = flagValue("--out")
+        case "--title": title = flagValue("--title")
         case "--append": appendFlag = true; i += 1
         case "--record": recordDir = flagValue("--record")
         default:
             err("listen: unrecognized argument '\(args[i])'")
-            err("usage: bionic listen [--out <transcript.jsonl>] [--append] [--record <session-dir>]")
+            err("usage: bionic listen [--out <transcript.jsonl>] [--title <short description>] [--append] [--record <session-dir>]")
             exit(2)
         }
     }
+    let outPathResolved = outPath ?? defaultTranscriptPath(title: title)
 
     // MARK: If retaining audio, create the session directory (0700) up front - BEFORE opening the
     // transcript, since the common invocation puts --out inside the session dir (make record uses
@@ -58,11 +67,11 @@ func runListen() async throws {
 
     // MARK: Reuse the exact --out/--append/refuse-if-exists/resume-seq logic the batch path
     // uses (openTurnOutput, main.swift) - not reimplemented.
-    let (handle, startSeq) = openTurnOutput(outPath: outPath, appendFlag: appendFlag)
+    let (handle, startSeq) = openTurnOutput(outPath: outPathResolved, appendFlag: appendFlag)
     // When retaining audio, the transcript is part of the same private session - tighten it to
     // 0600 to match the WAVs/manifest.
     if recordDir != nil {
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outPath)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outPathResolved)
     }
     let writer = TurnWriter(handle: handle, startSeq: startSeq)
     let merger = TurnMerger(writer: writer)
@@ -204,7 +213,41 @@ func runListen() async throws {
     }
 
     let seqRange = writer.emittedCount > 0 ? " (seq \(startSeq)-\(startSeq + writer.emittedCount - 1))" : ""
-    err("Done. Wrote \(writer.emittedCount) turn(s)\(seqRange) to \(outPath).")
+    err("Done. Wrote \(writer.emittedCount) turn(s)\(seqRange) to \(outPathResolved).")
+}
+
+/// Default `listen` output path when --out isn't given: the shared transcripts directory
+/// feedbackapp's `resources.yaml` registers as the "past-meetings" resource (see
+/// feedbackapp/config.py's init_config), so a call transcribed without an explicit --out is
+/// still something the responder can look up later, filed by date.
+func defaultTranscriptPath(title: String) -> String {
+    let dir = NSHomeDirectory() + "/.config/bionic/transcripts"
+    try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd-HH-mm-ss"
+    formatter.timeZone = TimeZone.current
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    let stamp = formatter.string(from: Date())
+    return "\(dir)/\(stamp)-\(slugify(title)).jsonl"
+}
+
+/// Lowercase, alphanumerics-and-dashes only, collapsed - "Q3 Revenue Review!!" -> "q3-revenue-review".
+/// Falls back to "meeting" for a title that slugifies to nothing (emoji-only, etc.) so the filename
+/// is never left with a bare trailing/leading dash or an empty description segment.
+func slugify(_ text: String) -> String {
+    var result = ""
+    var lastWasDash = false
+    for scalar in text.lowercased().unicodeScalars {
+        if CharacterSet.alphanumerics.contains(scalar) {
+            result.unicodeScalars.append(scalar)
+            lastWasDash = false
+        } else if !lastWasDash && !result.isEmpty {
+            result.append("-")
+            lastWasDash = true
+        }
+    }
+    while result.hasSuffix("-") { result.removeLast() }
+    return result.isEmpty ? "meeting" : result
 }
 
 /// Bridges a synchronous, signal-safety-constrained C signal handler into async/await: the

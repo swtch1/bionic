@@ -144,3 +144,52 @@ func runSelfTestMerge() async throws {
     err("SELFTEST-MERGE: PASS (all cases)")
     exit(0)
 }
+
+// MARK: - Automated verification of `listen`'s auto-naming (Listen.swift: defaultTranscriptPath,
+// slugify). Run via: swift run bionic --selftest-transcriptname
+func runSelfTestTranscriptName() async throws {
+    func fail(_ reason: String) -> Never {
+        err("SELFTEST-TRANSCRIPTNAME: FAIL - \(reason)")
+        exit(1)
+    }
+
+    // slugify: lowercases, collapses non-alphanumerics to single dashes, trims trailing dashes,
+    // and falls back to "meeting" rather than emitting an empty description segment.
+    let cases: [(String, String)] = [
+        ("Q3 Revenue Review!!", "q3-revenue-review"),
+        ("standup", "standup"),
+        ("Direct question: why so sad?", "direct-question-why-so-sad"),
+        ("   ", "meeting"),
+        ("---", "meeting"),
+    ]
+    for (input, expected) in cases {
+        let got = slugify(input)
+        if got != expected {
+            fail("slugify(\"\(input)\") = \"\(got)\", expected \"\(expected)\"")
+        }
+    }
+
+    // defaultTranscriptPath: lands in the shared transcripts directory, is named
+    // <timestamp>-<slug>.jsonl with a well-formed 19-char timestamp, and the directory actually
+    // gets created (feedbackapp's resources.yaml points the responder at this exact path).
+    let path = defaultTranscriptPath(title: "Weekly Sync")
+    let expectedDir = NSHomeDirectory() + "/.config/bionic/transcripts"
+    guard path.hasPrefix(expectedDir + "/") else {
+        fail("path \(path) not under \(expectedDir)")
+    }
+    var isDir: ObjCBool = false
+    guard FileManager.default.fileExists(atPath: expectedDir, isDirectory: &isDir), isDir.boolValue else {
+        fail("transcripts directory was not created at \(expectedDir)")
+    }
+    let filename = (path as NSString).lastPathComponent
+    guard filename.hasSuffix("-weekly-sync.jsonl") else {
+        fail("filename \(filename) missing expected slug suffix")
+    }
+    let timestamp = String(filename.dropLast("-weekly-sync.jsonl".count))
+    guard timestamp.count == 19, timestamp.filter({ $0 == "-" }).count == 5 else {
+        fail("timestamp \"\(timestamp)\" is not YYYY-MM-DD-HH-MM-SS shaped")
+    }
+
+    err("SELFTEST-TRANSCRIPTNAME: PASS - slugify x\(cases.count), path=\(path)")
+    exit(0)
+}

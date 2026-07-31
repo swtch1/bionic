@@ -2,7 +2,10 @@
 #
 # Overridable variables:
 #   AUDIO       audio file for `make transcribe`      (default: testdata/test_meeting.wav)
-#   OUT         output JSONL path                     (default: transcript.jsonl)
+#   OUT         output JSONL path for transcribe, or an override for `listen`
+#               (default: transcript.jsonl for transcribe; `listen` auto-names
+#               into ~/.config/bionic/transcripts/ unless OUT is set)
+#   TITLE       short description for `make listen`'s auto-named file (default: meeting)
 #   VOICEPRINT  voiceprint JSON for batch attribution (default: none -> self-enrollment)
 #   NAME        speaker name for `make enroll`        (default: me)
 #   SAMPLE      solo audio sample for `make enroll`   (default: testdata/test_meeting.wav)
@@ -10,6 +13,7 @@
 #   ARGS        extra flags passed through to the binary
 #
 # Example:
+#   make listen TITLE="q3 planning"
 #   make listen OUT=~/meetings/standup.jsonl
 #   make record  SESSION=~/meetings/standup          # live capture + retain audio
 #   make diarize SESSION=~/meetings/standup          # offline per-speaker attribution
@@ -24,6 +28,18 @@ SESSION    ?= session
 VOICEPRINT ?=
 ARGS       ?=
 PREFIX     ?= /usr/local
+TITLE      ?= meeting
+
+# `listen` auto-names its output into ~/.config/bionic/transcripts (see
+# Listen.swift's defaultTranscriptPath) when OUT isn't given - only pass --out
+# through when the caller actually set it on the command line, so plain
+# `make listen` gets the dated, discoverable filename instead of OUT's
+# transcribe-oriented default of "transcript.jsonl".
+ifeq ($(origin OUT),command line)
+LISTEN_OUT_FLAG := --out "$(OUT)"
+else
+LISTEN_OUT_FLAG :=
+endif
 
 # `make record SESSION=~/meetings/standup` used to fail with "Could not open
 # ~/meetings/standup/transcript.jsonl for writing": make does no tilde
@@ -73,8 +89,8 @@ build: check-deps ## Debug build
 release: check-deps ## Optimized build (use this for real meetings)
 	swift build -c release
 
-listen: release ## Live-capture a meeting in progress (Ctrl-C to stop)
-	$(RELEASE) listen --out "$(OUT)" $(ARGS)
+listen: release ## Live-capture a meeting (Ctrl-C to stop). TITLE=... names it; OUT=... overrides the auto path
+	$(RELEASE) listen $(LISTEN_OUT_FLAG) --title "$(TITLE)" $(ARGS)
 
 record: release ## Live-capture AND retain raw audio to SESSION for later diarization (Ctrl-C to stop)
 	@mkdir -p "$(SESSION)" || { echo "error: cannot create SESSION dir: $(SESSION)"; exit 1; }
@@ -105,6 +121,7 @@ test: build ## Run the automated self-tests
 	swift run $(BIN) --selftest-record-crash
 	swift run $(BIN) --selftest-session
 	swift run $(BIN) --selftest-vadthrow
+	swift run $(BIN) --selftest-transcriptname
 
 install: release ## Install the binary (PREFIX=/usr/local by default)
 	install -d "$(PREFIX)/bin"

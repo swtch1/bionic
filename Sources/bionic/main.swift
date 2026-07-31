@@ -581,6 +581,8 @@ if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "enroll" {
     runBlocking(runSelfTestVadThrow)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-record-child" {
     runBlocking { await runSelfTestRecordChild() }
+} else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-transcriptname" {
+    runBlocking(runSelfTestTranscriptName)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "repair-wav" {
     runBlocking(runRepairWav)
 } else {
