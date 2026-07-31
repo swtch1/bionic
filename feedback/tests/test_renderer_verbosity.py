@@ -45,8 +45,9 @@ def test_quiet_mode_still_shows_feedback_health_and_errors():
     r.notice("error: responder failed: X")
     text = out.getvalue()
     # The message, anchored to what it is about (no transcript on screen).
-    assert "re: billing is Go" in text
-    assert ">> [correction] assistant (checked repo): Billing is Python, not Go." in text
+    assert '> "billing is Go"' in text
+    assert ">> [correction] Billing is Python," in text
+    assert "not Go. (checked repo)" in text
     assert "stream-health" in text
     assert "error: responder failed" in text
 
@@ -67,3 +68,19 @@ def test_default_is_verbose_so_offline_replay_is_unchanged():
     out = io.StringIO()
     Renderer(stream=out).turn(_turn(seq=3))
     assert "#3 me:" in out.getvalue()
+
+
+def test_bubbles_wrap_long_text_without_truncating():
+    out = io.StringIO()
+    r = Renderer(stream=out, verbose=False)
+    long_message = " ".join(f"word{i}" for i in range(30))
+    long_claim = " ".join(f"claim{i}" for i in range(20))
+    r.response(ResponderOutput(message=long_message, addressed_claim=long_claim))
+    text = out.getvalue().replace("\n", " ")
+    for i in range(30):
+        assert f"word{i}" in text
+    for i in range(20):
+        assert f"claim{i}" in text
+    # continuation lines of the right bubble stay right-indented, not flush left.
+    lines = [ln for ln in out.getvalue().splitlines() if ln.strip()]
+    assert any(ln.startswith(" " * 28) and ">>" not in ln for ln in lines)

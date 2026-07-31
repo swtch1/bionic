@@ -15,9 +15,29 @@ Deliberately plain text - no TUI dependency in v0.
 from __future__ import annotations
 
 import sys
+import textwrap
 from datetime import datetime
 
 from .models import AnnotatedTurn, ResponderOutput, StreamHealthWarning
+
+# Bubble layout for responder output (Decision: 2026-07-29). Left bubble ("> ")
+# is a short primer for what's being replied to - never the full transcript
+# line, since the user was IN the meeting and doesn't need it played back.
+# Right bubble (">> ", indented) is the agent's message. Widths are chosen for
+# a normal terminal, not measured against $COLUMNS - this is a glance-at
+# overlay, not a full-width UI.
+_BUBBLE_WIDTH = 32
+_RIGHT_INDENT = 28
+
+
+def _bubble(text: str, *, prefix: str, indent: str = "") -> str:
+    """Wrap `text` to _BUBBLE_WIDTH, prefixing line 1 and aligning continuation
+    lines under the first character of text (not under the prefix)."""
+    lines = textwrap.wrap(text, width=_BUBBLE_WIDTH) or [""]
+    cont = indent + " " * len(prefix)
+    out = [f"{indent}{prefix}{lines[0]}"]
+    out.extend(f"{cont}{line}" for line in lines[1:])
+    return "\n".join(out)
 
 
 def _clock(start: float) -> str:
@@ -81,14 +101,17 @@ class Renderer:
             claim = out.addressed_claim or "candidate"
             self.debug(f"responder considered and stayed silent: {claim}")
             return
-        desc = f" ({out.description})" if out.description else ""
+        # Left bubble: a short primer for what this replies to, not the raw
+        # transcript line - the user was in the meeting and heard it already,
+        # they only need enough to place the reply. Shown in BOTH quiet and
+        # verbose mode: quiet mode has no transcript on screen at all, so a
+        # bare reply used to arrive with no referent.
+        if out.addressed_claim:
+            self._w(_bubble(f'"{out.addressed_claim}"', prefix="> "))
+            self._w("")
         typ = f"[{out.type}] " if out.type else ""
-        # In quiet mode there is no transcript on screen, so anchor the message
-        # to what it is about - otherwise a line arrives with no referent.
-        if not self.verbose and out.addressed_claim:
-            self._w(f"  re: {out.addressed_claim}")
-        # LLM messages render as left-side bubbles in the eventual UI.
-        self._w(f">> {typ}assistant{desc}: {out.message}")
+        desc = f" ({out.description})" if out.description else ""
+        self._w(_bubble(f"{typ}{out.message}{desc}", prefix=">> ", indent=" " * _RIGHT_INDENT))
 
     def notice(self, text: str) -> None:
         """Always shown: mode banners, errors, suppressed-for-a-reason events."""
