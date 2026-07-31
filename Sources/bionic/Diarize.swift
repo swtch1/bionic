@@ -96,6 +96,11 @@ struct SpeakerShareCodable: Codable {
 struct ClusterInfo: Codable {
     let label: String
     let centroid: [Float]
+    /// Total speaking time attributed to this cluster. Optional so sidecars written before this
+    /// field existed still decode; `review --enroll` needs it to decide whether a cluster carries
+    /// enough speech to move a stored voiceprint's centroid (see
+    /// VoiceprintStore.minDurationForCentroidUpdate).
+    let durationSeconds: Double?
 }
 struct ClustersSidecar: Codable {
     static let fileName = "clusters.json"
@@ -287,7 +292,16 @@ func runDiarize() async throws {
     // case ("me?" + bleed:true, never a hard "me"); anything ambiguous or far stays other:N. This is
     // the payoff of the whole feature - name someone once via review --enroll and they resolve
     // automatically in every later meeting, with no interactive prompt.
-    let voiceprints = loadVoiceprints(voiceprintPaths)
+    // No --voiceprints given: fall back to the shared default directory that `review --enroll`
+    // writes to. Without this, everything enrolled in previous meetings sat on disk and was only
+    // consulted if the user remembered to name the same path again.
+    var effectiveVoiceprintPaths = voiceprintPaths
+    if effectiveVoiceprintPaths.isEmpty,
+       FileManager.default.fileExists(atPath: VoiceprintStore.defaultDirectory) {
+        effectiveVoiceprintPaths = [VoiceprintStore.defaultDirectory]
+        err("Using enrolled voiceprints from \(VoiceprintStore.defaultDirectory) (pass --voiceprints to override).")
+    }
+    let voiceprints = loadVoiceprints(effectiveVoiceprintPaths)
     // A voiceprint named with a RESERVED word (other / unknown / an other:N label) can never bind a
     // cluster - decideBinding excludes those names as targets - so it would silently do nothing.
     // "me" is exempt: it legitimately drives bleed detection. Warn rather than ignore in silence.
@@ -303,19 +317,25 @@ func runDiarize() async throws {
         // embedding-model version silently cosine-distances to .infinity against every cluster and so
         // matches NOTHING, with no signal. Warn loudly, once, naming the offenders.
         if let segDim = diarResult.segments.first?.embedding.count {
-            let mismatched = voiceprints.filter { $0.embedding.count != segDim }
+            let mismatched = voiceprints.filter { $0.currentEmbedding.count != segDim }
             if !mismatched.isEmpty {
                 printBoxedWarning([
                     "# WARNING: \(mismatched.count) voiceprint(s) have an embedding dimension !=       ",
                     "# the diarizer's (\(segDim)). cosineDistance is .infinity for those, so they will ",
                     "# match NO cluster and auto-labeling silently does nothing for them:              ",
-                ] + mismatched.map { "#   \($0.name) (\($0.embedding.count)-d)" } + [
+                ] + mismatched.map { "#   \($0.name) (\($0.currentEmbedding.count)-d)" } + [
                     "# Re-enroll them with the same embedding model/version as this diarizer.          ",
                 ])
             }
         }
         for (label, centroid) in centroidByLabel {
-            let distances = voiceprints.map { (name: $0.name, dist: SpeakerUtilities.cosineDistance(centroid, $0.embedding)) }
+            // hybridDistance, not plain cosine-to-centroid: a voiceprint refined over several
+            // meetings also retains its most recent per-meeting embeddings, and someone who sounds
+            // unlike their long-term average today (different headset, a cold) may still match one
+            // of those exactly. Nearest of {centroid, recents} - see VoiceprintStore.
+            let distances = voiceprints.map {
+                (name: $0.name, dist: VoiceprintStore.hybridDistance(from: centroid, to: $0))
+            }
             switch decideBinding(distances: distances, dMe: dMe, margin: defaultBindMargin) {
             case .bleed:
                 bleedLabels.insert(label)
@@ -380,7 +400,15 @@ func runDiarize() async throws {
     let sidecar = ClustersSidecar(
         anchorEpoch: anchorEpoch,
         otherFile: other.file,
-        clusters: clusters.map { ClusterInfo(label: $0.label, centroid: centroidByLabel[$0.label] ?? []) }
+        clusters: clusters.map { cluster in
+            // Duration is summed from the cluster's own segments rather than read from
+            // durationById, so it stays correct regardless of how labels were assigned above.
+            ClusterInfo(
+                label: cluster.label,
+                centroid: centroidByLabel[cluster.label] ?? [],
+                durationSeconds: cluster.segments.reduce(0.0) { $0 + ($1.end - $1.start) }
+            )
+        }
     )
     let sidecarURL = dirURL.appendingPathComponent(ClustersSidecar.fileName)
     if let data = try? JSONEncoder().encode(sidecar) {
@@ -462,7 +490,9 @@ func writeDiarized(_ turns: [DiarizedTurn], to url: URL, inSessionDir: Bool) thr
 /// Load enrolled voiceprints (name + embedding) from the given paths. A directory expands to its
 /// top-level *.json files; a file is decoded directly. Each file is a Codable Speaker; we take its
 /// .name (used to spot the "me" print for bleed detection) and .currentEmbedding.
-func loadVoiceprints(_ paths: [String]) -> [(name: String, embedding: [Float])] {
+/// Returns the full `Speaker` (not just name + centroid) so matching can use the retained recent
+/// embeddings as additional anchors - see VoiceprintStore.hybridDistance.
+func loadVoiceprints(_ paths: [String]) -> [Speaker] {
     let fm = FileManager.default
     var files: [String] = []
     for p in paths {
@@ -474,7 +504,7 @@ func loadVoiceprints(_ paths: [String]) -> [(name: String, embedding: [Float])] 
             files.append(p)
         }
     }
-    var voiceprints: [(name: String, embedding: [Float])] = []
+    var voiceprints: [Speaker] = []
     for f in files {
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: f)),
               let speaker = try? JSONDecoder().decode(Speaker.self, from: data),
@@ -482,7 +512,7 @@ func loadVoiceprints(_ paths: [String]) -> [(name: String, embedding: [Float])] 
             err("diarize: could not load a voiceprint from \(f) - skipping.")
             continue
         }
-        voiceprints.append((name: speaker.name, embedding: speaker.currentEmbedding))
+        voiceprints.append(speaker)
     }
     return voiceprints
 }

@@ -23,7 +23,17 @@ func runReview() async throws {
     while i < args.count {
         switch args[i] {
         case "--play": play = true; i += 1
-        case "--enroll": enrollDir = flagValue("--enroll")
+        case "--enroll":
+            // Optional value. Bare `--enroll` uses the shared default directory, which is also
+            // where `diarize` looks without --voiceprints - previously the two paths were typed
+            // separately every time, and pointing them at different directories silently produced
+            // enrollments that nothing ever matched against.
+            if i + 1 < args.count, !args[i + 1].hasPrefix("--") {
+                enrollDir = flagValue("--enroll")
+            } else {
+                enrollDir = VoiceprintStore.defaultDirectory
+                i += 1
+            }
         case "--force": force = true; i += 1
         default:
             if sessionDir == nil { sessionDir = args[i] }
@@ -31,7 +41,8 @@ func runReview() async throws {
         }
     }
     guard let dir = sessionDir else {
-        err("usage: bionic review <session-dir> [--play] [--enroll <dir>] [--force]")
+        err("usage: bionic review <session-dir> [--play] [--enroll [dir]] [--force]")
+        err("  --enroll with no dir stores voiceprints in \(VoiceprintStore.defaultDirectory)")
         exit(2)
     }
     let dirURL = URL(fileURLWithPath: dir)
@@ -126,21 +137,35 @@ func runReview() async throws {
             err("--enroll given but \(ClustersSidecar.fileName) is missing - cannot persist voiceprints without cluster centroids.")
             return
         }
-        let fm = FileManager.default
-        try? fm.createDirectory(atPath: enrollDir, withIntermediateDirectories: true, attributes: nil)
-        let centroidByLabel = Dictionary(uniqueKeysWithValues: sidecar.clusters.map { ($0.label, $0.centroid) })
+        let infoByLabel = Dictionary(uniqueKeysWithValues: sidecar.clusters.map { ($0.label, $0) })
         for (label, name) in newlyNamed {
-            guard let centroid = centroidByLabel[label], !centroid.isEmpty else {
+            guard let info = infoByLabel[label], !info.centroid.isEmpty else {
                 err("  enroll: no centroid for \(label) - skipping \(name).")
                 continue
             }
-            let speaker = Speaker(name: name, currentEmbedding: centroid, duration: 0, isPermanent: true)
-            let outURL = URL(fileURLWithPath: enrollDir).appendingPathComponent("\(name).json")
+            // A sidecar written before ClusterInfo carried a duration reports nil. Treat that as
+            // "long enough": a whole cluster's centroid almost always clears the threshold, and the
+            // previous behavior overwrote unconditionally, so assuming eligible is strictly no worse
+            // than what this replaced.
+            let duration = Float(info.durationSeconds ?? Double(VoiceprintStore.minDurationForCentroidUpdate))
             do {
-                try JSONEncoder().encode(speaker).write(to: outURL)
-                err("  enrolled \(name) -> \(outURL.path)")
+                // upsert, not write: re-enrolling someone REFINES their stored voiceprint
+                // (weighted running centroid + recent-embedding FIFO) instead of discarding
+                // everything learned in previous meetings.
+                let outcome = try VoiceprintStore.upsert(
+                    name: name, embedding: info.centroid, duration: duration, in: enrollDir
+                )
+                let path = VoiceprintStore.path(forName: name, in: enrollDir)
+                switch outcome {
+                case .created:
+                    err("  enrolled \(name) -> \(path)")
+                case .refined(let observations, let centroidMoved):
+                    err(centroidMoved
+                        ? "  refined \(name) -> \(path) (now \(observations) observation(s))"
+                        : "  refined \(name) -> \(path) (kept as a recent sample only - \(String(format: "%.1f", duration))s is under the \(String(format: "%.1f", VoiceprintStore.minDurationForCentroidUpdate))s needed to move the centroid)")
+                }
             } catch {
-                err("  enroll: failed to write \(outURL.path): \(error)")
+                err("  enroll: failed to store \(name): \(error.localizedDescription)")
             }
         }
     }

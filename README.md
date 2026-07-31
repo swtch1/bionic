@@ -286,6 +286,26 @@ make test      # automated self-tests
 make clean
 ```
 
+### Speaker identity across meetings
+
+`review --enroll` stores a voiceprint per named cluster; `diarize` matches later meetings
+against them, so someone named once resolves automatically afterwards.
+
+```sh
+bionic review ~/meetings/standup --enroll   # no dir needed - uses the shared default
+bionic diarize ~/meetings/next               # picks up enrolled voices automatically
+```
+
+Both sides default to `~/.config/bionic/voiceprints`, so enrollment and matching cannot end up
+pointed at different directories. Passing an explicit path to either still works.
+
+Re-enrolling the same person **refines** their voiceprint rather than replacing it: the stored
+centroid is a running mean weighted by how many meetings it already represents, so one bad
+sample cannot undo months of evidence, and a cluster with less than 3s of speech is kept only
+as a recent-sample anchor without moving the centroid. Matching takes the nearest of the
+centroid and the last few per-meeting embeddings, which recovers the case where someone sounds
+unlike their long-term average today (new headset, a cold).
+
 ### Accuracy regression gate
 
 `make test` verifies plumbing - ordering, crash recovery, path shapes. It does not notice

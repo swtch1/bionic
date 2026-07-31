@@ -589,6 +589,8 @@ if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "enroll" {
     runBlocking(runSelfTestQualityMetrics)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-permissions" {
     runBlocking(runSelfTestPermissions)
+} else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-voiceprintstore" {
+    runBlocking(runSelfTestVoiceprintStore)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "make-fixture" {
     runBlocking(runMakeFixture)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "quality" {
