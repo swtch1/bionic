@@ -41,7 +41,7 @@ func runListen() async throws {
         case "--record": recordDir = flagValue("--record")
         default:
             err("listen: unrecognized argument '\(args[i])'")
-            err("usage: meetingscribe listen [--out <transcript.jsonl>] [--append] [--record <session-dir>]")
+            err("usage: bionic listen [--out <transcript.jsonl>] [--append] [--record <session-dir>]")
             exit(2)
         }
     }
@@ -82,7 +82,7 @@ func runListen() async throws {
     // completes and reaches `await stopSignal.wait()` below, rather than exiting instantly.
     let stopSignal = StopSignal()
     signal(SIGINT, SIG_IGN)
-    let sigSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: DispatchQueue(label: "meetingscribe.sigint"))
+    let sigSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: DispatchQueue(label: "bionic.sigint"))
     sigSource.setEventHandler {
         Task { await stopSignal.trigger() }
     }
@@ -95,7 +95,7 @@ func runListen() async throws {
     // complete manifest - exactly like Ctrl-C. (A crash/SIGKILL still can't be trapped; the
     // incremental header patch + partial manifest cover those.)
     signal(SIGTERM, SIG_IGN)
-    let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: DispatchQueue(label: "meetingscribe.sigterm"))
+    let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: DispatchQueue(label: "bionic.sigterm"))
     termSource.setEventHandler {
         Task { await stopSignal.trigger() }
     }

@@ -11,7 +11,7 @@ import Foundation
 //      inode over the target; an in-place truncating write keeps the same inode - so the inode
 //      changing across a rewrite is the observable signature of atomicity.
 //
-// Run via: swift run meetingscribe --selftest-review   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-review   (hidden subcommand, see main.swift)
 func runSelfTestReview() async throws {
     func fail(_ caseName: String, _ reason: String) -> Never {
         err("SELFTEST-REVIEW: FAIL [\(caseName)] - \(reason)")
@@ -31,7 +31,7 @@ func runSelfTestReview() async throws {
         }
         let lines = [good(0), "", "{ not json", good(1), #"{"seq":2,"speaker":42}"#]
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("meetingscribe-review-census-\(UUID().uuidString).jsonl")
+            .appendingPathComponent("bionic-review-census-\(UUID().uuidString).jsonl")
         try lines.joined(separator: "\n").write(to: tmp, atomically: true, encoding: .utf8)
         defer { try? fm.removeItem(at: tmp) }
 
@@ -50,7 +50,7 @@ func runSelfTestReview() async throws {
                          conf: 0.9, speakers: nil, bleed: nil, reason: nil, boundBy: nil)
         }
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("meetingscribe-review-atomic-\(UUID().uuidString).jsonl")
+            .appendingPathComponent("bionic-review-atomic-\(UUID().uuidString).jsonl")
         defer { try? fm.removeItem(at: tmp) }
 
         try writeDiarized([turn(0, "first")], to: tmp, inSessionDir: false)

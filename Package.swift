@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "MeetingScribe",
+    name: "Bionic",
     platforms: [.macOS(.v15)],
     dependencies: [
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.12.4")
     ],
     targets: [
         .executableTarget(
-            name: "meetingscribe",
+            name: "bionic",
             dependencies: [.product(name: "FluidAudio", package: "FluidAudio")]
         )
     ]

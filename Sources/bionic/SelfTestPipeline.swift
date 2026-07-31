@@ -20,7 +20,7 @@ import FluidAudio
 // speechEnd (real boundary, no padding involved); end on a chunk boundary and there is nothing to
 // pad. A test that skipped either would pass against the bug.
 //
-// Run via: swift run meetingscribe --selftest-pipeline   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-pipeline   (hidden subcommand, see main.swift)
 func runSelfTestPipeline() async throws {
     func fail(_ reason: String) -> Never {
         err("SELFTEST-PIPELINE: FAIL - \(reason)")

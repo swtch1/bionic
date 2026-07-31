@@ -1,4 +1,4 @@
-# meetingscribe - see README.md
+# bionic - see README.md
 #
 # Overridable variables:
 #   AUDIO       audio file for `make transcribe`      (default: testdata/test_meeting.wav)
@@ -38,7 +38,7 @@ override AUDIO   := $(patsubst ~/%,$(HOME)/%,$(AUDIO))
 override SAMPLE  := $(patsubst ~/%,$(HOME)/%,$(SAMPLE))
 override VOICEPRINT := $(patsubst ~/%,$(HOME)/%,$(VOICEPRINT))
 
-BIN     := meetingscribe
+BIN     := bionic
 RELEASE := .build/release/$(BIN)
 
 ifeq ($(strip $(VOICEPRINT)),)
@@ -52,7 +52,7 @@ endif
 .PHONY: help check-deps build release run listen record diarize review transcribe enroll test clean uninstall install
 
 help: ## Show this help
-	@echo "meetingscribe - live + offline meeting transcription to JSONL"
+	@echo "bionic - live + offline meeting transcription to JSONL"
 	@echo
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'

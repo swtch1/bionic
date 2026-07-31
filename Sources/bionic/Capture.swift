@@ -245,7 +245,7 @@ final class SystemAudioCapture: @unchecked Sendable {
         self.tap = tap
 
         let scStream = SCStream(filter: filter, configuration: config, delegate: tap)
-        try scStream.addStreamOutput(tap, type: .audio, sampleHandlerQueue: DispatchQueue(label: "meetingscribe.systemaudio"))
+        try scStream.addStreamOutput(tap, type: .audio, sampleHandlerQueue: DispatchQueue(label: "bionic.systemaudio"))
         self.stream = scStream
 
         try await scStream.startCapture()

@@ -1,7 +1,7 @@
 import Foundation
 import FluidAudio
 
-// meetingscribe v0 - offline batch transcriber.
+// bionic v0 - offline batch transcriber.
 //
 // Pipeline (unchanged): resample -> diarize into speaker turns -> transcribe each turn.
 // NEW output: an append-only JSONL transcript, one JSON object per finalized turn.
@@ -255,7 +255,7 @@ func runEnroll() async throws {
         }
     }
     guard let sample = samplePath, let name = speakerName else {
-        err("usage: meetingscribe enroll <clean_solo_sample.wav> --name <name> [--out <voiceprint.json>]")
+        err("usage: bionic enroll <clean_solo_sample.wav> --name <name> [--out <voiceprint.json>]")
         exit(2)
     }
 
@@ -357,7 +357,7 @@ func run() async throws {
         }
     }
     guard let path = audioPath else {
-        err("usage: meetingscribe <audiofile> [--voiceprint <path.json>] [--out <transcript.jsonl>] [--append]")
+        err("usage: bionic <audiofile> [--voiceprint <path.json>] [--out <transcript.jsonl>] [--append]")
         exit(2)
     }
 
@@ -541,7 +541,7 @@ func runBlocking(_ body: @escaping @Sendable () async throws -> Void) {
 }
 
 // Both write paths echo each turn to stdout for live visibility. The Swift runtime does NOT
-// ignore SIGPIPE, so `meetingscribe listen | consumer` where the consumer exits first would kill
+// ignore SIGPIPE, so `bionic listen | consumer` where the consumer exits first would kill
 // capture mid-meeting (exit 141) - losing the rest of the meeting to a broken pipe on what is only
 // a convenience echo. The JSONL FILE is the real output, so a dead stdout must never stop capture:
 // ignore SIGPIPE and let the failed writes be silently dropped.

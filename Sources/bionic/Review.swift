@@ -31,13 +31,13 @@ func runReview() async throws {
         }
     }
     guard let dir = sessionDir else {
-        err("usage: meetingscribe review <session-dir> [--play] [--enroll <dir>] [--force]")
+        err("usage: bionic review <session-dir> [--play] [--enroll <dir>] [--force]")
         exit(2)
     }
     let dirURL = URL(fileURLWithPath: dir)
     let diarizedURL = dirURL.appendingPathComponent("transcript.diarized.jsonl")
     guard FileManager.default.fileExists(atPath: diarizedURL.path) else {
-        err("No transcript.diarized.jsonl in \(dir) - run `meetingscribe diarize \(dir)` first.")
+        err("No transcript.diarized.jsonl in \(dir) - run `bionic diarize \(dir)` first.")
         exit(2)
     }
 
@@ -49,7 +49,7 @@ func runReview() async throws {
     if load.skipped > 0 && !force {
         err("ERROR: \(load.skipped) unparseable line(s) in \(diarizedURL.lastPathComponent) (first at line \(load.firstBadLine ?? -1)).")
         err("review rewrites this file in place, so continuing would permanently drop the unparseable line(s). Your file was NOT modified.")
-        err("This is diarize's own output; a malformed line means something upstream is wrong. Regenerate it with `meetingscribe diarize \(dir) --force`, or pass --force to rewrite keeping only the parsed lines (destructive).")
+        err("This is diarize's own output; a malformed line means something upstream is wrong. Regenerate it with `bionic diarize \(dir) --force`, or pass --force to rewrite keeping only the parsed lines (destructive).")
         exit(2)
     }
     if load.skipped > 0 {
@@ -191,7 +191,7 @@ func playSlice(dirURL: URL, otherFile: String, anchorEpoch: Double, turn: Diariz
     guard endIdx > startIdx else { err("  (--play: empty slice)"); return }
     let slice = Array(all[startIdx..<endIdx])
 
-    let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("meetingscribe-play-\(UUID().uuidString).wav")
+    let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("bionic-play-\(UUID().uuidString).wav")
     let rec = AudioRecorder(url: tmpURL, sampleRate: Double(sampleRate))
     let sem = DispatchSemaphore(value: 0)
     Task { try? await rec.open(); await rec.append(slice); await rec.finish(); sem.signal() }

@@ -17,7 +17,7 @@ import FluidAudio
 // A deliberately non-chunk-aligned sample count is used so any off-by-a-chunk padding bug can't
 // hide behind alignment.
 //
-// Run via: swift run meetingscribe --selftest-record   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-record   (hidden subcommand, see main.swift)
 func runSelfTestRecord() async throws {
     func fail(_ reason: String) -> Never {
         err("SELFTEST-RECORD: FAIL - \(reason)")
@@ -26,7 +26,7 @@ func runSelfTestRecord() async throws {
 
     let sampleRate = 16000
     let tmpDir = URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("meetingscribe-selftest-record-\(UUID().uuidString)")
+        .appendingPathComponent("bionic-selftest-record-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: tmpDir) }
     let wavURL = tmpDir.appendingPathComponent("rec.wav")

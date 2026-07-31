@@ -7,7 +7,7 @@ import Foundation
 // it returns (parsed turns, total content lines, skipped count, first offending 1-based line number)
 // so diarize can warn and, when a transcript is substantially broken, refuse.
 //
-// Run via: swift run meetingscribe --selftest-loadturns   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-loadturns   (hidden subcommand, see main.swift)
 func runSelfTestLoadTurns() async throws {
     func fail(_ caseName: String, _ reason: String) -> Never {
         err("SELFTEST-LOADTURNS: FAIL [\(caseName)] - \(reason)")
@@ -24,7 +24,7 @@ func runSelfTestLoadTurns() async throws {
     }
     let lines = [good(0), "", "{ this is not json", good(1), #"{"seq":2,"start":"oops"}"#]
     let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("meetingscribe-loadturns-\(UUID().uuidString).jsonl")
+        .appendingPathComponent("bionic-loadturns-\(UUID().uuidString).jsonl")
     try lines.joined(separator: "\n").write(to: tmp, atomically: true, encoding: .utf8)
     defer { try? FileManager.default.removeItem(at: tmp) }
 

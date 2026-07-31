@@ -22,7 +22,7 @@ import FluidAudio
 // early per throw - that benign shift is not the bug. The bug is counter DIVERGENCE, which the
 // force-finalize end boundary isolates.)
 //
-// Run via: swift run meetingscribe --selftest-vadthrow
+// Run via: swift run bionic --selftest-vadthrow
 
 /// A scripted stand-in for VadManager.processStreamingChunk: throws on the given call indices and
 /// emits a single speechStart on another, mimicking real VAD's contract that a throw happens BEFORE

@@ -17,7 +17,7 @@ import AVFoundation
 //     landed on disk, and the parent waits for that line before killing. The kill is therefore
 //     always after durable data exists, never racing the first write.
 //
-// Run via: swift run meetingscribe --selftest-record-crash   (hidden; spawns --selftest-record-child)
+// Run via: swift run bionic --selftest-record-crash   (hidden; spawns --selftest-record-child)
 
 /// The CHILD half. Opens a recorder, feeds it several seconds of synthetic audio (model-free: no
 /// VAD/ASR), prints FLUSHED once durable data is on disk, then SPINS so the parent can SIGKILL it.
@@ -71,7 +71,7 @@ private func performRecordCrashTest() {
     }
     let sampleRate = 16000
     let tmpDir = URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("meetingscribe-crash-\(UUID().uuidString)")
+        .appendingPathComponent("bionic-crash-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: tmpDir) }
     let wavURL = tmpDir.appendingPathComponent("rec.wav")

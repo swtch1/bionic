@@ -8,7 +8,7 @@ import Foundation
 // split, never a split turn), no diarizer overlap, a coverage miss, and a small-skew regression
 // that a naive equality-based aligner would get wrong.
 //
-// Run via: swift run meetingscribe --selftest-reconcile   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-reconcile   (hidden subcommand, see main.swift)
 func runSelfTestReconcile() async throws {
     func fail(_ caseName: String, _ reason: String) -> Never {
         err("SELFTEST-RECONCILE: FAIL [\(caseName)] - \(reason)")

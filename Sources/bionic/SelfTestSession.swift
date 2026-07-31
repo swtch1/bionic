@@ -11,14 +11,14 @@ import Foundation
 // stream, and DELIBERATELY never call finishAndWriteManifest - simulating a crash - then assert the
 // partial manifest exists with incomplete:true and a non-nil anchorEpoch for BOTH streams.
 //
-// Run via: swift run meetingscribe --selftest-session   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-session   (hidden subcommand, see main.swift)
 func runSelfTestSession() async throws {
     func fail(_ reason: String) -> Never {
         err("SELFTEST-SESSION: FAIL - \(reason)")
         exit(1)
     }
     let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("meetingscribe-session-\(UUID().uuidString)")
+        .appendingPathComponent("bionic-session-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: tmp) }
 
     let session = try RecordingSession.create(dir: tmp.path)

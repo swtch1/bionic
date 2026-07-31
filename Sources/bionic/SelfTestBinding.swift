@@ -8,7 +8,7 @@ import Foundation
 // behaviors: a confident unambiguous bind, an ambiguous near-tie that must NOT guess, a lone
 // candidate with no runner-up, bleed OVERRIDING a nearer colleague, and no-match-at-all.
 //
-// Run via: swift run meetingscribe --selftest-binding   (hidden subcommand, see main.swift)
+// Run via: swift run bionic --selftest-binding   (hidden subcommand, see main.swift)
 func runSelfTestBinding() async throws {
     func fail(_ caseName: String, _ reason: String) -> Never {
         err("SELFTEST-BINDING: FAIL [\(caseName)] - \(reason)")

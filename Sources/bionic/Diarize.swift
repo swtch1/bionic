@@ -144,7 +144,7 @@ func runDiarize() async throws {
         }
     }
     guard let dir = sessionDir else {
-        err("usage: meetingscribe diarize <session-dir> [--transcript <path>] [--voiceprints <dir|file>] [--speakers <N> | --max-speakers <N>] [--purity <f>] [--coverage <f>] [--force]")
+        err("usage: bionic diarize <session-dir> [--transcript <path>] [--voiceprints <dir|file>] [--speakers <N> | --max-speakers <N>] [--purity <f>] [--coverage <f>] [--force]")
         exit(2)
     }
     if exactSpeakers != nil && maxSpeakers != nil {
@@ -193,7 +193,7 @@ func runDiarize() async throws {
         let hdrFrames = wav.headerDataBytes / 2, diskFrames = wav.diskDataBytes / 2
         err("WARNING: \(other.file)'s header reports \(hdrFrames) frames but \(diskFrames) frames of audio are physically on disk.")
         err("         The session likely terminated abnormally, leaving the header under-reporting its length. The audio is intact.")
-        err("         Recover it first:  meetingscribe repair-wav \(otherWavURL.path)")
+        err("         Recover it first:  bionic repair-wav \(otherWavURL.path)")
         if !force {
             err("         Diarizing now would only see the \(hdrFrames) frames the header admits. Run repair-wav, or pass --force to diarize the truncated view.")
             exit(2)

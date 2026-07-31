@@ -47,7 +47,7 @@ func inspectWav(path: String) -> (dataStart: Int, headerDataBytes: Int, diskData
 func runRepairWav() async throws {
     let args = CommandLine.arguments
     guard args.count >= 3 else {
-        err("usage: meetingscribe repair-wav <file.wav>")
+        err("usage: bionic repair-wav <file.wav>")
         err("  Rewrites the RIFF/data size fields from the file's actual byte length. Use on a")
         err("  recording whose header under-reports its length (e.g. a session killed mid-write).")
         exit(2)

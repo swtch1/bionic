@@ -1,4 +1,4 @@
-# meetingscribe
+# bionic
 
 Transcribes meetings on macOS into an append-only JSONL stream of speaker-attributed
 turns. Runs fully on-device - audio never leaves the machine.
@@ -7,10 +7,10 @@ Modes:
 
 | Mode | Command | Speaker attribution | When |
 |---|---|---|---|
-| **Live** | `meetingscribe listen` | Structural - mic is `me`, system audio is `other` | During a call |
-| **Batch** | `meetingscribe <audio.wav>` | Voiceprint - cosine distance to an enrolled embedding | On a recording |
-| **Diarize** | `meetingscribe diarize <session-dir>` | Offline - splits `other` into `other:1..N` speaker clusters | After a `listen --record` session |
-| **Review** | `meetingscribe review <session-dir>` | Human - put real names on the clusters | After `diarize` |
+| **Live** | `bionic listen` | Structural - mic is `me`, system audio is `other` | During a call |
+| **Batch** | `bionic <audio.wav>` | Voiceprint - cosine distance to an enrolled embedding | On a recording |
+| **Diarize** | `bionic diarize <session-dir>` | Offline - splits `other` into `other:1..N` speaker clusters | After a `listen --record` session |
+| **Review** | `bionic review <session-dir>` | Human - put real names on the clusters | After `diarize` |
 
 Live mode collapses every remote participant to `other`. To recover per-person identity you
 opt into audio retention during the call (`listen --record <dir>`), then run `diarize` (offline
@@ -59,7 +59,7 @@ grant it, then fully quit and reopen the terminal app (the grant is read at laun
 ### Live capture
 
 ```sh
-meetingscribe listen [--out transcript.jsonl] [--append]
+bionic listen [--out transcript.jsonl] [--append]
 ```
 
 Press Ctrl-C once to stop and flush cleanly. A second Ctrl-C force-exits (useful if
@@ -71,7 +71,7 @@ Live mode retains **no** audio by default - nothing is written to disk except th
 Per-person speaker naming needs the raw audio afterward, so it is **opt-in** via `--record`:
 
 ```sh
-meetingscribe listen --out session/transcript.jsonl --record session/
+bionic listen --out session/transcript.jsonl --record session/
 # or: make record SESSION=session
 ```
 
@@ -107,7 +107,7 @@ manifest is incomplete). If you have a recording whose header under-reports its 
 an older build, or killed in the sub-second window between a flush and its header patch - repair it:
 
 ```sh
-meetingscribe repair-wav <file.wav>   # rewrites the RIFF/data size fields from the actual byte length
+bionic repair-wav <file.wav>   # rewrites the RIFF/data size fields from the actual byte length
 ```
 
 `diarize` detects this case itself: if `other.wav` holds more audio than its header admits, it stops
@@ -118,9 +118,9 @@ and points you at `repair-wav` rather than silently diarizing the truncated view
 Once you have a recorded session:
 
 ```sh
-meetingscribe diarize <session-dir> [--voiceprints <dir>] [--speakers N | --max-speakers N] \
+bionic diarize <session-dir> [--voiceprints <dir>] [--speakers N | --max-speakers N] \
                                     [--purity 0.6] [--coverage 0.5] [--force]
-meetingscribe review  <session-dir> [--play] [--enroll <dir>] [--force]
+bionic review  <session-dir> [--play] [--enroll <dir>] [--force]
 ```
 
 If you know the headcount, tell it: `--speakers N` pins the exact number of speakers and
@@ -176,7 +176,7 @@ something is wrong. `--force` overrides, keeping only the parsed lines. The rewr
 ### Batch transcription
 
 ```sh
-meetingscribe <audio.wav> [--voiceprint me.json] [--out transcript.jsonl] [--append]
+bionic <audio.wav> [--voiceprint me.json] [--out transcript.jsonl] [--append]
 ```
 
 Without `--voiceprint`, the tool falls back to **circular self-enrollment**: it assumes
@@ -187,7 +187,7 @@ real voiceprint for anything you care about.
 ### Enrollment
 
 ```sh
-meetingscribe enroll <clean_solo_sample.wav> --name me --out me.json
+bionic enroll <clean_solo_sample.wav> --name me --out me.json
 ```
 
 Use 30+ seconds of only your voice, recorded on the hardware you actually use. The
@@ -287,16 +287,16 @@ make clean
 
 | File | Role |
 |---|---|
-| `Sources/meetingscribe/main.swift` | CLI dispatch, batch pipeline, enrollment, shared helpers |
-| `Sources/meetingscribe/Listen.swift` | Live `listen` subcommand: wiring, shutdown, signals |
-| `Sources/meetingscribe/Capture.swift` | Mic (AVAudioEngine) and system audio (ScreenCaptureKit) adapters |
-| `Sources/meetingscribe/TurnPipeline.swift` | Streaming VAD -> turn boundaries -> per-turn ASR |
-| `Sources/meetingscribe/TurnMerger.swift` | Reorders the two live streams into ascending `start` |
-| `Sources/meetingscribe/AudioRecorder.swift` | Opt-in audio retention: WAV writer, capture tee, session manifest |
-| `Sources/meetingscribe/Reconcile.swift` | Pure overlap logic mapping diarizer clusters onto turns |
-| `Sources/meetingscribe/Diarize.swift` | `diarize` subcommand: offline clustering + reconciliation |
-| `Sources/meetingscribe/Review.swift` | `review` subcommand: name clusters, persist voiceprints |
-| `Sources/meetingscribe/SelfTest*.swift` | Automated tests (merger ordering, pipeline, reconcile, recorder) |
+| `Sources/bionic/main.swift` | CLI dispatch, batch pipeline, enrollment, shared helpers |
+| `Sources/bionic/Listen.swift` | Live `listen` subcommand: wiring, shutdown, signals |
+| `Sources/bionic/Capture.swift` | Mic (AVAudioEngine) and system audio (ScreenCaptureKit) adapters |
+| `Sources/bionic/TurnPipeline.swift` | Streaming VAD -> turn boundaries -> per-turn ASR |
+| `Sources/bionic/TurnMerger.swift` | Reorders the two live streams into ascending `start` |
+| `Sources/bionic/AudioRecorder.swift` | Opt-in audio retention: WAV writer, capture tee, session manifest |
+| `Sources/bionic/Reconcile.swift` | Pure overlap logic mapping diarizer clusters onto turns |
+| `Sources/bionic/Diarize.swift` | `diarize` subcommand: offline clustering + reconciliation |
+| `Sources/bionic/Review.swift` | `review` subcommand: name clusters, persist voiceprints |
+| `Sources/bionic/SelfTest*.swift` | Automated tests (merger ordering, pipeline, reconcile, recorder) |
 
 Built on [FluidAudio](https://github.com/FluidInference/FluidAudio) for VAD, Parakeet
 ASR, and diarization.

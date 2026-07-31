@@ -40,7 +40,7 @@ import Foundation
 // Case B's earlier turn time to arrive, and keeps the first-tick margin ~150ms so the test can't
 // flake if a tick drifts late under load). Production default is 1.5s (see TurnMerger's doc).
 //
-// Run via: swift run meetingscribe --selftest-merge   (hidden subcommand, see main.swift dispatch)
+// Run via: swift run bionic --selftest-merge   (hidden subcommand, see main.swift dispatch)
 func runSelfTestMerge() async throws {
     let watermark: TimeInterval = 0.4
 
@@ -55,7 +55,7 @@ func runSelfTestMerge() async throws {
         _ caseName: String,
         drive: (TurnMerger) async throws -> Void
     ) async throws -> (turns: [Turn], startSeq: Int) {
-        let tmpPath = NSTemporaryDirectory() + "meetingscribe-selftest-\(UUID().uuidString).jsonl"
+        let tmpPath = NSTemporaryDirectory() + "bionic-selftest-\(UUID().uuidString).jsonl"
         defer { try? FileManager.default.removeItem(atPath: tmpPath) }
 
         let (handle, startSeq) = openTurnOutput(outPath: tmpPath, appendFlag: false)
