@@ -286,6 +286,29 @@ make test      # automated self-tests
 make clean
 ```
 
+### Accuracy regression gate
+
+`make test` verifies plumbing - ordering, crash recovery, path shapes. It does not notice
+if diarization gets *worse*. That is what the quality gate is for:
+
+```sh
+make fixture        # synthesize testdata/quality/ + its ground truth (one-off, ~10s)
+make quality        # score DER against the committed baseline
+make quality-bless  # record current accuracy AS the baseline
+```
+
+The fixture is built by `say`, so the reference transcript and speaker boundaries are exact
+by construction rather than hand-labelled. The baseline is a **ratchet, not a target**: the
+committed number is simply what the current stack scores, and the gate fails when a change
+makes it worse by more than the tolerance (0.02 DER, above cross-machine inference jitter).
+Improvements pass and print a prompt to re-bless.
+
+Read the number for what it is. Synthesized speech has no overlap, no crosstalk and no room
+noise, so it scores far better than a real meeting - this detects regressions, it does not
+estimate real-world accuracy. A recorded fixture is still needed for that. The current
+baseline (DER 0.30, with the diarizer merging two of three speakers on clean synthetic
+audio) is a floor to improve on, not a standard to be proud of.
+
 - `docs/manual-live-capture-test.md` - the manual end-to-end test procedure. Run this
   before trusting a change to the capture path; it's the only test that exercises real
   hardware.

@@ -1,0 +1,50 @@
+{
+  "audioFile" : "meeting_3speakers_en.wav",
+  "note" : "Synthesized by `bionic make-fixture` via macOS `say`. Ground truth is exact by construction (each utterance was rendered separately, then concatenated with 0.4s gaps). NOT representative of real meeting audio: no overlap, no crosstalk, no room noise. Use for regression detection, not for absolute accuracy claims.",
+  "sampleRate" : 16000,
+  "segments" : [
+    {
+      "end" : 2.9409375,
+      "speaker" : "alice",
+      "start" : 0,
+      "text" : "Good morning everyone, let us start the sprint review."
+    },
+    {
+      "end" : 6.746874999999999,
+      "speaker" : "bob",
+      "start" : 3.3409375,
+      "text" : "Thanks Alice. The billing service migration is finished."
+    },
+    {
+      "end" : 10.4589375,
+      "speaker" : "alice",
+      "start" : 7.146875,
+      "text" : "Did we keep the old endpoints working for existing clients?"
+    },
+    {
+      "end" : 14.9364375,
+      "speaker" : "bob",
+      "start" : 10.8589375,
+      "text" : "Yes, both versions run side by side until the next release."
+    },
+    {
+      "end" : 17.9109375,
+      "speaker" : "carol",
+      "start" : 15.3364375,
+      "text" : "I have an update on the frontend dashboard as well."
+    },
+    {
+      "end" : 21.1474375,
+      "speaker" : "alice",
+      "start" : 18.310937499999998,
+      "text" : "Go ahead Carol, we have plenty of time left."
+    },
+    {
+      "end" : 24.9531875,
+      "speaker" : "carol",
+      "start" : 21.547437499999997,
+      "text" : "The new charts load twice as fast after the caching change."
+    }
+  ],
+  "transcript" : "Good morning everyone, let us start the sprint review. Thanks Alice. The billing service migration is finished. Did we keep the old endpoints working for existing clients? Yes, both versions run side by side until the next release. I have an update on the frontend dashboard as well. Go ahead Carol, we have plenty of time left. The new charts load twice as fast after the caching change."
+}

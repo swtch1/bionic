@@ -65,7 +65,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-deps build release run listen record diarize review transcribe enroll test clean uninstall install
+.PHONY: help check-deps build release run listen record diarize review transcribe enroll test clean uninstall install fixture quality quality-bless
 
 help: ## Show this help
 	@echo "bionic - live + offline meeting transcription to JSONL"
@@ -123,7 +123,19 @@ test: build ## Run the automated self-tests
 	swift run $(BIN) --selftest-vadthrow
 	swift run $(BIN) --selftest-transcriptname
 	swift run $(BIN) --selftest-tapexception
+	swift run $(BIN) --selftest-qualitymetrics
 	swift run $(BIN) --selftest-permissions
+
+fixture: build ## (Re)generate the synthesized accuracy fixture + its ground truth
+	swift run $(BIN) make-fixture
+
+quality: build ## Score diarization accuracy (DER) against the committed baseline
+	@test -f testdata/quality/quality-baseline.json || { \
+	  echo "error: no baseline yet. Run 'make fixture' then 'make quality-bless'"; exit 1; }
+	swift run $(BIN) quality
+
+quality-bless: build ## Record current accuracy AS the baseline (review the diff before committing)
+	swift run $(BIN) quality --bless
 
 install: release ## Install the binary (PREFIX=/usr/local by default)
 	install -d "$(PREFIX)/bin"
