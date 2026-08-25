@@ -57,6 +57,15 @@ func runSelfTestPermissions() async throws {
     if !ScreenRecordingPermission.remediation.contains("Screen & System Audio Recording") {
         failures.append("screen-recording remediation does not name the Settings pane")
     }
+    // The remediation is only worth writing if it survives the trip to the user. It did not:
+    // runBlocking's catch interpolated the error, printing the bare case name and dropping every
+    // word of instruction. Assert through describe() - the same rendering main.swift uses - so a
+    // regression there fails here rather than in front of a first-time user.
+    let rendered = describe(ListenError.screenRecordingDenied)
+    if !rendered.contains("Screen & System Audio Recording") {
+        failures.append("screenRecordingDenied renders as '\(rendered)' - the remediation text is " +
+                        "lost before it reaches the user")
+    }
 
     // --- Probe agreement: the two-stage mic check must be consistent with the raw APIs. ---
     // This is the part that actually exercises the live probe rather than trusting the enum.

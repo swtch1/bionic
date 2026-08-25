@@ -126,6 +126,7 @@ test: build ## Run the automated self-tests
 	swift run $(BIN) --selftest-qualitymetrics
 	swift run $(BIN) --selftest-permissions
 	swift run $(BIN) --selftest-voiceprintstore
+	swift run $(BIN) --selftest-stophang
 
 fixture: build ## (Re)generate the synthesized accuracy fixture + its ground truth
 	swift run $(BIN) make-fixture

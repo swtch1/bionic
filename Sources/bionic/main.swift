@@ -526,13 +526,25 @@ func run() async throws {
 // would inherit MainActor isolation and need the main thread to run - but the main
 // thread blocks on `sema.wait()` below, which deadlocks (Task body never executes).
 // `Task.detached` runs off-MainActor on a cooperative worker thread, so it proceeds.
+/// How every uncaught error reaches the user.
+///
+/// `errorDescription`, not `"\(error)"`: interpolating an enum prints the bare case name
+/// ("screenRecordingDenied"), silently discarding the remediation text a LocalizedError exists to
+/// carry - which is why `listen` reported a one-word error where README promised instructions.
+/// Falling back to interpolation rather than `localizedDescription` keeps that same short name for
+/// plain Errors, whose localizedDescription is the useless "The operation couldn't be completed.
+/// (bionic.X error 0.)".
+func describe(_ error: Error) -> String {
+    (error as? LocalizedError)?.errorDescription ?? "\(error)"
+}
+
 func runBlocking(_ body: @escaping @Sendable () async throws -> Void) {
     let sema = DispatchSemaphore(value: 0)
     Task.detached {
         do {
             try await body()
         } catch {
-            err("Error: \(error)")
+            err("Error: \(describe(error))")
             exit(1)
         }
         sema.signal()
@@ -591,6 +603,10 @@ if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "enroll" {
     runBlocking(runSelfTestPermissions)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-voiceprintstore" {
     runBlocking(runSelfTestVoiceprintStore)
+} else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-stophang" {
+    runBlocking(runSelfTestStopHang)
+} else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--selftest-stophang-child" {
+    runBlocking { await runSelfTestStopHangChild() }
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "make-fixture" {
     runBlocking(runMakeFixture)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "quality" {

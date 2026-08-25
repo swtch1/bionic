@@ -65,11 +65,13 @@ under Audio Capture consent alone, with no Screen Recording grant. Moving to it 
 this permission entirely and let us tap a specific meeting app instead of the whole output
 mix. Not yet done - tracked as a known improvement.
 
-If Screen Recording is missing, `listen` now fails immediately with instructions rather than
-hanging at "Starting system-audio capture" (`CGPreflightScreenCaptureAccess` is checked before
+If Screen Recording is missing, `listen` fails immediately with instructions rather than hanging
+at "Starting system-audio capture" (`CGPreflightScreenCaptureAccess` is checked before
 ScreenCaptureKit is touched, since `SCShareableContent.current` blocks instead of erroring when
-the grant is absent). Grant it, then fully quit and reopen the terminal app - the grant is read
-at launch.
+the grant is absent). The check runs before anything else - before the microphone is opened,
+before models load, and before the transcript file is created, so a refused run leaves nothing
+behind for the retry to trip over. Grant it, then fully quit and reopen the terminal app - the
+grant is read at launch.
 
 ## Usage
 
@@ -79,8 +81,10 @@ at launch.
 bionic listen [--out transcript.jsonl] [--append]
 ```
 
-Press Ctrl-C once to stop and flush cleanly. A second Ctrl-C force-exits (useful if
-startup itself is wedged on a missing permission).
+Press Ctrl-C once to stop and flush cleanly. If startup itself is wedged - a microphone prompt
+that never appears because the process has no responsible GUI app, e.g. under tmux or ssh - one
+Ctrl-C (or one `kill`) still ends it: the request can't be flushed, so it force-exits a few
+seconds later with a note saying why. A second Ctrl-C skips that wait.
 
 ### Retained audio
 
@@ -117,7 +121,8 @@ manifest, a one-line notice goes to stderr, and transcription continues.
 **Crash-safe recording.** The WAV header (which tells readers how many samples the file holds) is
 rewritten on disk every ~1s as audio is flushed, and `fsync`'d - so an abnormal exit (SIGKILL, a
 segfault, power loss, or a second Ctrl-C force-quit) costs at most the last ~1s, never the whole
-recording. `SIGTERM` (`kill <pid>`) and Ctrl-C both flush cleanly and write the full manifest. As
+recording. `SIGTERM` (`kill <pid>`) and Ctrl-C both flush cleanly and write the full manifest once capture is
+running; before that, there is nothing captured to flush and either one force-exits instead. As
 soon as the first audio arrives a partial `manifest.json` is written carrying the epoch anchor, so
 even a session that never shuts down cleanly stays reconcilable by `diarize` (which warns that the
 manifest is incomplete). If you have a recording whose header under-reports its length - one made by

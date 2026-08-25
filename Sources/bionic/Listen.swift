@@ -53,6 +53,19 @@ func runListen() async throws {
             exit(2)
         }
     }
+
+    // MARK: Fail fast on a missing Screen Recording grant - before any file is created, any model
+    // is loaded, and before the microphone is touched. Ordering matters twice over. Mic capture
+    // raises its own TCC prompt, which BLOCKS; a screen-recording check placed after it never gets
+    // to speak on a first run, so the documented "fails immediately with instructions" never fired
+    // and the user got a bare hang instead. And openTurnOutput refuses to overwrite an existing
+    // --out, so a run that dies after opening it leaves a file behind that makes the retry fail
+    // for a second, unrelated-looking reason. The preflight is instant and never prompts
+    // (PermissionHealth.swift).
+    guard ScreenRecordingPermission.isGranted() else {
+        throw ListenError.screenRecordingDenied
+    }
+
     let outPathResolved = outPath ?? defaultTranscriptPath(title: title)
 
     // MARK: If retaining audio, create the session directory (0700) up front - BEFORE opening the
@@ -76,39 +89,12 @@ func runListen() async throws {
     let writer = TurnWriter(handle: handle, startSeq: startSeq)
     let merger = TurnMerger(writer: writer)
 
-    // MARK: SIGINT -> clean flush-and-exit, installed FIRST, before model loading/capture
-    // startup (which can take several seconds) - installing it later would leave a real window
-    // where an early Ctrl-C lands while SIGINT still has its default (terminate-immediately)
-    // disposition, or - worse - after `signal(SIGINT, SIG_IGN)` but before the DispatchSourceSignal
-    // is resumed, where it would be silently swallowed and never seen again. Installed on a
-    // DEDICATED BACKGROUND QUEUE, not `.main`: runBlocking() (main.swift) blocks the actual main
-    // thread on a DispatchSemaphore for the whole run, so it never services the main dispatch
-    // queue - a signal source targeting `.main` would simply never fire, and Ctrl-C would hang
-    // instead of exiting cleanly. SIG_IGN suppresses the default terminate-immediately behavior
-    // so THIS handler (not the OS default) decides when the process exits, after flushing and
-    // closing the output file. If SIGINT arrives before startup finishes, `stopSignal.trigger()`
-    // still records it (actor state, not lost) - shutdown then begins as soon as startup
-    // completes and reaches `await stopSignal.wait()` below, rather than exiting instantly.
-    let stopSignal = StopSignal()
-    signal(SIGINT, SIG_IGN)
-    let sigSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: DispatchQueue(label: "bionic.sigint"))
-    sigSource.setEventHandler {
-        Task { await stopSignal.trigger() }
-    }
-    sigSource.resume()
-
-    // SIGTERM -> the SAME graceful flush-and-exit as SIGINT. `kill <pid>` (and orderly logout/
-    // shutdown) sends SIGTERM; without this it would hit the OS default (terminate immediately),
-    // losing the un-flushed audio buffer AND skipping the final authoritative manifest. Routing it
-    // through stopSignal.trigger() means kill flushes both WAVs, joins the pipelines, and writes the
-    // complete manifest - exactly like Ctrl-C. (A crash/SIGKILL still can't be trapped; the
-    // incremental header patch + partial manifest cover those.)
-    signal(SIGTERM, SIG_IGN)
-    let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: DispatchQueue(label: "bionic.sigterm"))
-    termSource.setEventHandler {
-        Task { await stopSignal.trigger() }
-    }
-    termSource.resume()
+    // MARK: Stop handling, installed FIRST - before model loading and capture startup, which
+    // together can take many seconds. Installed later, an early Ctrl-C would land on SIGINT's
+    // default terminate-immediately disposition. See StopControl.swift for why the force-exit
+    // escape hatch exists and why it lives on GCD rather than in the async path.
+    let stop = StopCoordinator()
+    stop.installHandlers()
 
     err("Loading VAD model...")
     let vad = try await VadManager()
@@ -145,11 +131,11 @@ func runListen() async throws {
         }
     }
 
-    // Check permissions BEFORE opening any capture. Both failures are otherwise near-invisible: a
-    // missing Screen Recording grant makes ScreenCaptureKit hang rather than error, and a broken
-    // mic yields a transcript with no "me" turns, which reads exactly like a quiet meeting.
-    // Warn rather than exit for the mic: a system-audio-only recording is still useful, and it is
-    // not this command's place to decide that a half-capture is worthless.
+    // Mic health, checked before opening capture: a broken mic yields a transcript with no "me"
+    // turns, which reads exactly like a quiet meeting. Warn rather than exit - a system-audio-only
+    // recording is still useful, and it is not this command's place to decide that a half-capture
+    // is worthless. (The Screen Recording grant is the hard requirement, already checked at the
+    // top of this function.)
     if let micWarning = MicrophonePermission.message(for: MicrophonePermission.check()) {
         printBoxedWarning(micWarning.split(separator: "\n", omittingEmptySubsequences: false)
             .map { "# \($0)" })
@@ -195,7 +181,7 @@ func runListen() async throws {
 
     err("Listening. Press Ctrl-C to stop.")
 
-    await stopSignal.wait()
+    await stop.startupCompleteAndWait()
 
     err("\nStopping capture... (press Ctrl-C again to force-quit)")
     mic.stop()
@@ -258,40 +244,4 @@ func slugify(_ text: String) -> String {
     }
     while result.hasSuffix("-") { result.removeLast() }
     return result.isEmpty ? "meeting" : result
-}
-
-/// Bridges a synchronous, signal-safety-constrained C signal handler into async/await: the
-/// handler itself stays minimal (just spawns a Task), and runListen() awaits `wait()` to learn
-/// when to begin shutdown.
-actor StopSignal {
-    private var stopped = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func trigger() {
-        // Second Ctrl-C -> hard exit. The graceful path (below) only runs once runListen()
-        // reaches `await stopSignal.wait()`, which is AFTER capture startup (model load +
-        // mic/ScreenCaptureKit init) completes. If startup itself hangs - e.g. a missing Screen
-        // Recording TCC grant leaving `SCShareableContent.current` blocked forever - a single
-        // Ctrl-C would set `stopped` here but never be acted on, and the process would be
-        // un-interruptible. A second Ctrl-C forces the exit. This works even mid-hang because the
-        // signal handler runs `trigger()` on the global executor, which still has free threads
-        // while runListen() is suspended on the blocked startup await.
-        // Tradeoff: a reflexive double-tap during a HEALTHY shutdown force-exits mid-flush. That's
-        // acceptable - writes are one direct write() syscall per line, so at worst an un-flushed
-        // in-progress turn is lost; no already-written line is ever torn.
-        if stopped {
-            err("\nSecond interrupt - forcing exit.")
-            exit(130)
-        }
-        stopped = true
-        for w in waiters { w.resume() }
-        waiters = []
-    }
-
-    func wait() async {
-        if stopped { return }
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            waiters.append(cont)
-        }
-    }
 }
