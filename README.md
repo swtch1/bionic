@@ -31,18 +31,56 @@ make release          # build
 make listen           # start capturing a call; Ctrl-C to stop
 ```
 
-Installing system-wide, or running the [feedback app](feedback/README.md) alongside it,
+Installing the binary, or running the [feedback app](feedback/README.md) alongside it,
 needs a one-time config setup:
 
 ```sh
-make install           # installs the bionic binary (PREFIX=/usr/local by default)
-make init               # creates ~/.config/bionic (config, resources.yaml, transcripts/)
+make install           # installs the bionic binary to ~/.local/bin
+make init              # creates ~/.config/bionic (config, resources.yaml, transcripts/)
 ```
+
+`make install` needs no `sudo`: it defaults to `PREFIX=~/.local`, so the binary lands in
+`~/.local/bin` (add that to your `PATH` if it isn't there). For a system-wide install use
+`sudo make install PREFIX=/usr/local`.
 
 `make help` lists every target.
 
 The first `make listen` will trigger two macOS permission prompts. **Grant both** - see
 [Permissions](#permissions) if you don't get prompted.
+
+### One command for a whole meeting
+
+`bionic meeting` runs the parts that are normally three commands in three terminals:
+live capture with retained audio, the [feedback app](feedback/README.md) rendering in
+this terminal, and diarization when you stop it.
+
+```sh
+bionic meeting "weekly sync"            # Ctrl-C to stop; diarize runs on exit
+make meeting TITLE="weekly sync"        # same thing from a clone, no install needed
+```
+
+The session lands in `<meetings_dir>/<date>-<slug>/` as a directory, so notes and
+attachments can sit beside the transcript. A second meeting with the same title on the
+same day gets a `-2`, `-3` suffix rather than failing. Capture's own output goes to
+`listen.log` in there so the feedback app has the screen to itself.
+
+`bionic meeting` works from any directory, and reads two keys from
+`~/.config/bionic/config.yaml` (`BIONIC_MEETINGS_DIR` and `BIONIC_REPO` override them):
+
+| key | what it is | default |
+| --- | --- | --- |
+| `meetings_dir` | where session directories are created | `~/meetings` |
+| `repo_dir` | this checkout - holds `scripts/meeting.sh` and the feedback venv | required |
+
+`repo_dir` has no sensible default because an installed binary cannot infer where the
+repo went; `bionic meeting` says so and exits rather than guessing.
+
+Without `ANTHROPIC_API_KEY` the feedback app still renders the live stream, but the gate
+and responder stay off. `--no-live` records only; `--no-diarize` skips the clustering
+pass (as `ARGS=` under `make`). Diarization is skipped automatically if the session's
+manifest says capture ended incomplete - the transcript and audio are still written.
+
+Afterwards, `bionic review <dir>` puts real names on the speaker clusters.
 
 ## Permissions
 

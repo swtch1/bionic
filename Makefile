@@ -11,6 +11,7 @@
 #   SAMPLE      solo audio sample for `make enroll`   (default: testdata/test_meeting.wav)
 #   SESSION     session directory for record/diarize/review (default: ./session)
 #   ARGS        extra flags passed through to the binary
+#   PREFIX      install location for `make install`   (default: ~/.local)
 #
 # Example:
 #   make listen TITLE="q3 planning"
@@ -27,7 +28,10 @@ NAME       ?= me
 SESSION    ?= session
 VOICEPRINT ?=
 ARGS       ?=
-PREFIX     ?= /usr/local
+# Default to a user-writable prefix: /usr/local/bin needs sudo on a stock
+# macOS install, and `make install` has no business asking for it. Override
+# with PREFIX=/usr/local (under sudo) for a system-wide install.
+PREFIX     ?= $(HOME)/.local
 TITLE      ?= meeting
 
 # `listen` auto-names its output into ~/.config/bionic/transcripts (see
@@ -53,6 +57,7 @@ override OUT     := $(patsubst ~/%,$(HOME)/%,$(OUT))
 override AUDIO   := $(patsubst ~/%,$(HOME)/%,$(AUDIO))
 override SAMPLE  := $(patsubst ~/%,$(HOME)/%,$(SAMPLE))
 override VOICEPRINT := $(patsubst ~/%,$(HOME)/%,$(VOICEPRINT))
+override PREFIX  := $(patsubst ~/%,$(HOME)/%,$(PREFIX))
 
 BIN     := bionic
 RELEASE := .build/release/$(BIN)
@@ -65,7 +70,7 @@ endif
 
 .DEFAULT_GOAL := help
 
-.PHONY: help check-deps build release run listen record diarize review transcribe enroll test clean uninstall install init fixture quality quality-bless
+.PHONY: help check-deps build release run listen record meeting diarize review transcribe enroll test clean uninstall install init fixture quality quality-bless
 
 help: ## Show this help
 	@echo "bionic - live + offline meeting transcription to JSONL"
@@ -95,6 +100,18 @@ listen: release ## Live-capture a meeting (Ctrl-C to stop). TITLE=... names it; 
 record: release ## Live-capture AND retain raw audio to SESSION for later diarization (Ctrl-C to stop)
 	@mkdir -p "$(SESSION)" || { echo "error: cannot create SESSION dir: $(SESSION)"; exit 1; }
 	$(RELEASE) listen --out "$(SESSION)/transcript.jsonl" --record "$(SESSION)" $(ARGS)
+
+# SESSION is passed through only when the caller set it, so the script's own
+# dated default (<meetings_dir>/<date>-<slug>) survives a plain `make meeting`
+# instead of being flattened onto SESSION's generic "session".
+ifeq ($(origin SESSION),command line)
+MEETING_SESSION_FLAG := --session "$(SESSION)"
+else
+MEETING_SESSION_FLAG :=
+endif
+
+meeting: release ## Everything at once: record + retain audio + live feedback, then diarize on Ctrl-C
+	scripts/meeting.sh --title "$(TITLE)" $(MEETING_SESSION_FLAG) $(ARGS)
 
 diarize: release ## Offline per-speaker attribution over a recorded SESSION (writes transcript.diarized.jsonl)
 	$(RELEASE) diarize "$(SESSION)" $(ARGS)
@@ -139,10 +156,19 @@ quality: build ## Score diarization accuracy (DER) against the committed baselin
 quality-bless: build ## Record current accuracy AS the baseline (review the diff before committing)
 	swift run $(BIN) quality --bless
 
-install: release ## Install the binary (PREFIX=/usr/local by default)
-	install -d "$(PREFIX)/bin"
-	install -m 0755 "$(RELEASE)" "$(PREFIX)/bin/$(BIN)"
+install: release ## Install the binary (PREFIX=~/.local by default; PREFIX=/usr/local for system-wide)
+	@install -d "$(PREFIX)/bin" 2>/dev/null || { \
+	  echo "error: cannot create $(PREFIX)/bin (permission denied)."; \
+	  echo "       Install somewhere you own:  make install PREFIX=$(HOME)/.local"; \
+	  echo "       Or system-wide:             sudo make install PREFIX=/usr/local"; exit 1; }
+	@install -m 0755 "$(RELEASE)" "$(PREFIX)/bin/$(BIN)" 2>/dev/null || { \
+	  echo "error: cannot write $(PREFIX)/bin/$(BIN) (permission denied)."; \
+	  echo "       Install somewhere you own:  make install PREFIX=$(HOME)/.local"; \
+	  echo "       Or system-wide:             sudo make install PREFIX=/usr/local"; exit 1; }
 	@echo "installed $(PREFIX)/bin/$(BIN)"
+	@case ":$$PATH:" in *":$(PREFIX)/bin:"*) ;; *) \
+	  echo "note: $(PREFIX)/bin is not on your PATH. Add to ~/.zshrc:"; \
+	  echo "      export PATH=\"$(PREFIX)/bin:$$PATH\"" ;; esac
 	@echo "run 'make init' to set up ~/.config/bionic before your first meeting"
 
 init: ## One-time setup: create ~/.config/bionic (config + transcripts dir)

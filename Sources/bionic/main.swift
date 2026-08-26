@@ -613,6 +613,8 @@ if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "enroll" {
     runBlocking(runQualityGate)
 } else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "repair-wav" {
     runBlocking(runRepairWav)
+} else if CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "meeting" {
+    runBlocking(runMeeting)
 } else {
     runBlocking(run)
 }
