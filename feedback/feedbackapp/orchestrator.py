@@ -61,6 +61,8 @@ class Orchestrator:
         self._stop = False
         self._gate_backoff = Backoff()
         self._throttle = ErrorThrottle()
+        self._responder_throttle = ErrorThrottle()
+        self._responder_failures = 0
 
     def stop(self) -> None:
         self._stop = True
@@ -177,7 +179,7 @@ class Orchestrator:
         self._gate_backoff.succeed()
         return decision
 
-    def _disable_live(self, exc: Exception) -> None:
+    def _disable_live(self, exc: Exception, what: str | None = None) -> None:
         """Turn the live path off for the rest of the session, once, loudly.
 
         Capture keeps running: the transcript and the diarization that follows it
@@ -185,11 +187,16 @@ class Orchestrator:
         credential at all."""
         self.gate = None
         self.responder = None
+        hint = (
+            "\n     `claude setup-token` mints an OAuth token, not an API key - export it as "
+            "CLAUDE_CODE_OAUTH_TOKEN, not ANTHROPIC_API_KEY."
+            if what is None
+            else ""
+        )
         self.renderer.notice(
-            f"live mode OFF: credential rejected ({exc.__class__.__name__}). "
-            "Capture and diarization continue.\n"
-            "     `claude setup-token` mints an OAuth token, not an API key - it must be "
-            "exported as CLAUDE_CODE_OAUTH_TOKEN, not ANTHROPIC_API_KEY."
+            f"live mode OFF: {what or 'credential rejected'} "
+            f"({exc.__class__.__name__}: {exc}). Capture and diarization continue."
+            + hint
         )
 
     def _run_responder(self, job: tuple) -> None:
@@ -222,17 +229,34 @@ class Orchestrator:
             # be a type check without importing the SDK-dependent module.
             if self._stop and isinstance(e, ResponderSilent):
                 self.renderer.debug("responder interrupted by shutdown before emitting")
-            elif is_auth_failure(e):
-                # Same permanent failure as on the gate side, reached when the
-                # gate is authorised and the responder's CLI subprocess is not.
-                self._disable_live(e)
             else:
                 # A responder/API failure must not vanish as an unretrieved-task
                 # dump on stderr (item 3): surface it through the same channel as
                 # everything else, and let the loop continue.
-                self.renderer.notice(f"error: responder failed: {e.__class__.__name__}: {e}")
+                self._report_responder_failure(e)
+        else:
+            self._responder_failures = 0
         finally:
             self.state.in_flight = False
+
+    # The responder deliberately does NOT get the gate's auth policy:
+    # is_auth_failure() cannot see a credential rejection here. The `claude` CLI
+    # prints "Failed to authenticate. API Error: 401 ..." on STDOUT and exits 1;
+    # the agent SDK's message reader chokes on the non-JSON line and raises a
+    # bare ProcessError - no status, no class-name hint, empty stderr (verified
+    # 2026-08-26). So classify nothing here, and guard the thing that actually
+    # hurt the user instead: repetition. A responder failing this many times in
+    # a row is broken, not unlucky, whatever the cause.
+    RESPONDER_FAILURE_LIMIT = 3
+
+    def _report_responder_failure(self, exc: Exception) -> None:
+        self._responder_failures += 1
+        if self._responder_failures >= self.RESPONDER_FAILURE_LIMIT:
+            self._disable_live(exc, what=f"responder failed {self._responder_failures}x")
+            return
+        line = self._responder_throttle.report(exc)
+        if line is not None:
+            self.renderer.notice(f"error: responder failed: {line}")
 
     def _surface_stream_health(self) -> None:
         # Reference clock is the latest turn seen in the stream (not wall time),

@@ -184,3 +184,79 @@ def test_transient_gate_failures_back_off_instead_of_flooding(tmp_path):
     assert out.count("error: gate failed") == 1, out
     assert h.orch.gate is not None, "a transient failure must not disable live mode"
     assert "#15 other: turn 15" in out, "polling/rendering paused with the gate"
+
+
+# --- the responder side -------------------------------------------------------
+# A credential rejection is UNCLASSIFIABLE here: the `claude` CLI prints
+# "Failed to authenticate. API Error: 401 OAuth access token is invalid." on
+# STDOUT and exits 1, and the agent SDK turns that into a bare ProcessError with
+# no status_code, no telling class name and an empty stderr (verified against
+# the real CLI, 2026-08-26). So the orchestrator guards repetition instead.
+
+class _ProcessError(Exception):
+    pass
+
+
+_ProcessError.__name__ = "ProcessError"
+
+_BARE_SDK_MESSAGE = "Command failed with exit code 1 (exit code: 1)"
+
+
+def test_the_real_sdk_failure_shape_is_not_detectable_as_auth():
+    """Pins the finding above. If a future SDK starts carrying the status, this
+    fails and the auth policy can be extended to cover the responder."""
+    assert not is_auth_failure(_ProcessError(_BARE_SDK_MESSAGE))
+
+
+class _AlwaysFailingResponderClient:
+    def __init__(self):
+        self.calls = 0
+
+    def run(self, *, model, system, prompt):
+        self.calls += 1
+        raise _ProcessError(_BARE_SDK_MESSAGE)
+
+
+def test_a_repeatedly_failing_responder_disables_live_rather_than_flooding(tmp_path):
+    client = _AlwaysFailingResponderClient()
+    h = build_orchestrator(tmp_path, gate_client=StubGateClient(fire=True),
+                           resp_client=client, poll_interval=0.02)
+    # Cooldown would otherwise space the retries out past the test's patience.
+    h.orch.state.config.response_cooldown_seconds = 0
+    for seq in range(1, 8):
+        with open(h.target, "a") as fh:
+            fh.write(_line(seq) + "\n")
+        h.orch.tick()
+
+    out = h.stream.getvalue()
+    assert client.calls == h.orch.RESPONDER_FAILURE_LIMIT, (
+        f"responder kept being retried after the limit ({client.calls} calls)"
+    )
+    assert out.count("live mode OFF") == 1, out
+    assert h.orch.state.in_flight is False, "in_flight leaked when live mode was disabled"
+    # No credential advice on this path: the failure was not classified as auth.
+    assert "CLAUDE_CODE_OAUTH_TOKEN" not in out
+
+
+def test_an_occasional_responder_failure_does_not_disable_live(tmp_path):
+    """One failure then a success must leave the live path intact - the counter
+    is CONSECUTIVE failures, not lifetime."""
+    from conftest import StubResponderClient
+
+    class _FailsOnce(StubResponderClient):
+        def run(self, *, model, system, prompt):
+            if self.calls == 0:
+                self.calls += 1
+                raise _ProcessError(_BARE_SDK_MESSAGE)
+            return super().run(model=model, system=system, prompt=prompt)
+
+    h = build_orchestrator(tmp_path, gate_client=StubGateClient(fire=True),
+                           resp_client=_FailsOnce(), poll_interval=0.02)
+    h.orch.state.config.response_cooldown_seconds = 0
+    for seq in (1, 2, 3, 4):
+        with open(h.target, "a") as fh:
+            fh.write(_line(seq) + "\n")
+        h.orch.tick()
+
+    assert h.orch.gate is not None and h.orch.responder is not None
+    assert "live mode OFF" not in h.stream.getvalue()
