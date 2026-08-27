@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from .config import CONFIG_DIR, ConfigError, init_config, load_config
+from .auth import from_env as credential_from_env
 from .gate import AnthropicGateClient, Gate
 from .hygiene import Hygiene
 from .orchestrator import Orchestrator
@@ -76,8 +77,15 @@ def main(argv: list[str] | None = None) -> int:
 
     gate = responder = None
     if args.live:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            print("ERROR: --live needs ANTHROPIC_API_KEY. Running offline instead is: drop --live.", file=sys.stderr)
+        cred = credential_from_env()
+        if cred is None:
+            print(
+                "ERROR: --live needs a credential. Either:\n"
+                "         CLAUDE_CODE_OAUTH_TOKEN=$(claude setup-token)   # subscription/corporate plan\n"
+                "         ANTHROPIC_API_KEY=sk-ant-api03-...              # console key\n"
+                "       Running offline instead is: drop --live.",
+                file=sys.stderr,
+            )
             return 2
         # The responder shells out to the `claude` CLI via claude-agent-sdk, and
         # `make setup` installs only the pip packages. Without this check the app
@@ -90,13 +98,15 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-        gate = Gate(AnthropicGateClient(), config.gate_model)
+        gate = Gate(AnthropicGateClient(credential=cred), config.gate_model)
         from .responder_live import ClaudeAgentResponderClient
 
         responder = Responder(
             # File tools are confined to these roots - see responder_live's
             # can_use_tool. Meeting speech is attacker-controlled input.
-            ClaudeAgentResponderClient(allowed_roots=[r.path for r in config.resources]),
+            ClaudeAgentResponderClient(
+                allowed_roots=[r.path for r in config.resources], credential=cred
+            ),
             config.responder_model, config.resources, config.glanceability,
         )
         missing = [r.path for r in config.resources if not Path(r.path).expanduser().exists()]
@@ -109,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"Edit {CONFIG_DIR / 'resources.yaml'}."
             )
         renderer.notice(
-            "live mode: gate=on, responder=on"
+            f"live mode: gate=on, responder=on ({cred.kind} from {cred.source})"
             + ("" if verbose else " - quiet (only feedback is printed; -v for the transcript)")
         )
     else:

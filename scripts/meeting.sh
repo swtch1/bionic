@@ -138,10 +138,10 @@ if [ "$live" = 1 ]; then
         echo "note: feedback app not set up - run 'make -C feedback setup'. Recording only."
     else
         fb_args=(run --transcript "$transcript")
-        if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}${ANTHROPIC_API_KEY:-}" ]; then
             fb_args+=(--live)
         else
-            echo "note: ANTHROPIC_API_KEY not set - feedback renders the stream but the gate/responder stay off."
+            echo "note: no credential (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY) - feedback renders the stream but the gate/responder stay off."
         fi
         ( cd "$repo/feedback" && exec "$venv_py" -m feedbackapp "${fb_args[@]}" ) &
         fb_pid=$!

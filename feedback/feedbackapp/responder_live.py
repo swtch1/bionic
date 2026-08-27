@@ -102,10 +102,10 @@ MAX_TURNS = 30
 
 
 # Benign CLI chatter that would otherwise land in the middle of the user's
-# meeting screen. This one fires on EVERY responder call because we deliberately
-# authenticate the gate with ANTHROPIC_API_KEY, which is exactly what the notice
-# is complaining about - it is expected, not actionable, and unstoppable at the
-# source. Anything NOT matching is passed through to stderr: a filter that
+# meeting screen. This one fires on EVERY responder call because the CLI is
+# authenticated with an explicit credential rather than an interactive login,
+# which is exactly what the notice is complaining about - it is expected, not
+# actionable, and unstoppable at the source. Anything NOT matching is passed through to stderr: a filter that
 # swallowed everything would hide real SDK failures.
 _BENIGN_STDERR = (
     "claude.ai connectors are disabled",
@@ -205,9 +205,23 @@ class ClaudeAgentResponderClient:
     are confined to them. Passing none leaves the responder web-only.
     """
 
-    def __init__(self, cwd: str | None = None, allowed_roots: list[str] | None = None):
+    def __init__(
+        self,
+        cwd: str | None = None,
+        allowed_roots: list[str] | None = None,
+        credential=None,
+    ):
         self._cwd = cwd
         self._roots = [r for r in (_resolve(p) for p in (allowed_roots or [])) if r is not None]
+        if credential is None:
+            from .auth import from_env
+
+            credential = from_env()
+        # The CLI subprocess inherits our env, so an OAuth token sitting in
+        # ANTHROPIC_API_KEY is wrong THERE too - it would try it as an api-key
+        # and 401 exactly like the gate did. auth.Credential decides the
+        # override; empty means run offline/unauthenticated and let the CLI say so.
+        self._env = credential.subprocess_env() if credential is not None else {}
 
     def run(self, *, model: str, system: str, prompt: str) -> dict:
         return asyncio.run(self._run_async(model=model, system=system, prompt=prompt))
@@ -233,6 +247,8 @@ class ClaudeAgentResponderClient:
             setting_sources=None,
             # Keep benign CLI chatter off the meeting screen (see _forward_stderr).
             stderr=_forward_stderr,
+            # Merged over os.environ by the SDK - see __init__.
+            env=self._env,
         )
 
         # AUTO_APPROVED shadows can_use_tool BY DESIGN (emit_feedback and

@@ -75,8 +75,18 @@ same day gets a `-2`, `-3` suffix rather than failing. Capture's own output goes
 `repo_dir` has no sensible default because an installed binary cannot infer where the
 repo went; `bionic meeting` says so and exits rather than guessing.
 
-Without `ANTHROPIC_API_KEY` the feedback app still renders the live stream, but the gate
-and responder stay off. `--no-live` records only; `--no-diarize` skips the clustering
+The gate and responder need a credential, either of:
+
+```sh
+export CLAUDE_CODE_OAUTH_TOKEN="$(claude setup-token)"   # subscription / corporate plan
+export ANTHROPIC_API_KEY=sk-ant-api03-...                # console key
+```
+
+`claude setup-token` mints an **OAuth token** (`sk-ant-oat01-...`), not an API key: it is
+sent as `Authorization: Bearer`, so putting it in `ANTHROPIC_API_KEY` meant a 401 on every
+tick. That shape is now detected wherever it is set, but the dedicated variable is the
+unambiguous place for it. With neither set the feedback app still renders the live stream,
+and the gate and responder stay off. `--no-live` records only; `--no-diarize` skips the clustering
 pass (as `ARGS=` under `make`). Diarization is skipped automatically if the session's
 manifest says capture ended incomplete - the transcript and audio are still written.
 

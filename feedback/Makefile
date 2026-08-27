@@ -40,7 +40,7 @@ replay:
 run:
 	$(PY) -m feedbackapp run --transcript "$(TRANSCRIPT)" $(ARGS)
 
-# LLM path (needs ANTHROPIC_API_KEY). Quiet by default: prints only feedback,
+# LLM path (needs CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY). Quiet by default: prints only feedback,
 # warnings and errors. Add the transcript stream + per-tick trace with:
 #   make run-live TRANSCRIPT=... ARGS=-v
 run-live:

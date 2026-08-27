@@ -84,6 +84,10 @@ GATE_SCHEMA = {
 }
 
 
+class AuthMissing(RuntimeError):
+    """No usable credential in the environment."""
+
+
 class GateClient(Protocol):
     """Minimal surface the gate needs. The real impl wraps anthropic.Anthropic;
     tests pass a stub. Returns the raw JSON text of the structured output."""
@@ -108,13 +112,23 @@ class AnthropicGateClient:
     TIMEOUT_SECONDS = 15.0
     MAX_RETRIES = 1
 
-    def __init__(self, client=None):
+    def __init__(self, client=None, credential=None):
         # Imported lazily so the offline path never requires the dependency.
         if client is None:
             import anthropic
 
+            from .auth import from_env
+
+            cred = credential or from_env()
+            if cred is None:
+                raise AuthMissing(
+                    "no credential: set CLAUDE_CODE_OAUTH_TOKEN (from "
+                    "`claude setup-token`) or ANTHROPIC_API_KEY"
+                )
             client = anthropic.Anthropic(
-                timeout=self.TIMEOUT_SECONDS, max_retries=self.MAX_RETRIES
+                timeout=self.TIMEOUT_SECONDS,
+                max_retries=self.MAX_RETRIES,
+                **cred.client_kwargs(),
             )
         self._client = client
 

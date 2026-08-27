@@ -43,7 +43,10 @@ make replay FIXTURE=fixtures/wrong_fact.jsonl TRANSCRIPT=/tmp/live.jsonl MODE=tu
 ```
 
 The offline path (replay -> tailer -> hygiene -> renderer) runs with **no API
-key**. The LLM path is `make run-live` (needs `ANTHROPIC_API_KEY`).
+key**. The LLM path is `make run-live`, which needs either
+`CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token` - the subscription/corporate
+path) or `ANTHROPIC_API_KEY` (a console key). An OAuth token is Bearer-authed;
+see `feedbackapp/auth.py` for why the distinction is load-bearing.
 
 `make init` is safe to re-run - it never overwrites a file that's already
 there, so editing `resources.yaml` and re-running it later is a no-op.

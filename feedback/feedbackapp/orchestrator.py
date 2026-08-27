@@ -27,6 +27,7 @@ import time
 from typing import Optional
 
 from .config import AppConfig
+from .errors import Backoff, ErrorThrottle, is_auth_failure
 from .gate import Gate
 from .hygiene import Hygiene
 from .models import AnnotatedTurn, render_turn_line
@@ -58,6 +59,8 @@ class Orchestrator:
         self.state = OrchestratorState(config=config.window)
         self._clock = clock
         self._stop = False
+        self._gate_backoff = Backoff()
+        self._throttle = ErrorThrottle()
 
     def stop(self) -> None:
         self._stop = True
@@ -122,14 +125,8 @@ class Orchestrator:
         if self.state.in_flight:
             return None
 
-        decision = self.gate.evaluate(
-            instructions=self.config.instructions,
-            resource_registry=self.config.resource_registry_text,
-            window=self.window.turns,
-            newest_batch=self.window.newest_batch,
-            recently_addressed=list(self.state.recently_addressed),
-        )
-        if not decision.fire:
+        decision = self._evaluate_gate()
+        if decision is None or not decision.fire:
             return None
 
         ok, reason = self.state.can_fire(self._clock())
@@ -149,6 +146,51 @@ class Orchestrator:
         # sees the attribution_suspect flags its system prompt tells it to act on.
         raw_window = "\n".join(render_turn_line(at) for at in self.window.turns)
         return (decision, raw_window)
+
+    def _evaluate_gate(self):
+        """The gate call plus its failure policy (see errors.py). Returns a
+        decision, or None when the gate is disabled, backing off, or just failed.
+
+        Deliberately NOT left to the per-tick boundary in run(): that catch is
+        too coarse to tell a rejected credential from a 429, and pausing the
+        whole tick would pause polling and rendering with it - the half that
+        must never lag behind the meeting."""
+        if not self._gate_backoff.ready(self._clock()):
+            return None
+        try:
+            decision = self.gate.evaluate(
+                instructions=self.config.instructions,
+                resource_registry=self.config.resource_registry_text,
+                window=self.window.turns,
+                newest_batch=self.window.newest_batch,
+                recently_addressed=list(self.state.recently_addressed),
+            )
+        except Exception as e:
+            if is_auth_failure(e):
+                self._disable_live(e)
+            else:
+                delay = self._gate_backoff.fail(self._clock())
+                line = self._throttle.report(e)
+                if line is not None:
+                    self.renderer.notice(f"error: gate failed: {line} - retrying in {delay:.0f}s")
+            return None
+        self._gate_backoff.succeed()
+        return decision
+
+    def _disable_live(self, exc: Exception) -> None:
+        """Turn the live path off for the rest of the session, once, loudly.
+
+        Capture keeps running: the transcript and the diarization that follows it
+        are the part of the meeting the user cannot get back, and they need no
+        credential at all."""
+        self.gate = None
+        self.responder = None
+        self.renderer.notice(
+            f"live mode OFF: credential rejected ({exc.__class__.__name__}). "
+            "Capture and diarization continue.\n"
+            "     `claude setup-token` mints an OAuth token, not an API key - it must be "
+            "exported as CLAUDE_CODE_OAUTH_TOKEN, not ANTHROPIC_API_KEY."
+        )
 
     def _run_responder(self, job: tuple) -> None:
         """The slow half: run the responder, render its output, record the
@@ -180,6 +222,10 @@ class Orchestrator:
             # be a type check without importing the SDK-dependent module.
             if self._stop and isinstance(e, ResponderSilent):
                 self.renderer.debug("responder interrupted by shutdown before emitting")
+            elif is_auth_failure(e):
+                # Same permanent failure as on the gate side, reached when the
+                # gate is authorised and the responder's CLI subprocess is not.
+                self._disable_live(e)
             else:
                 # A responder/API failure must not vanish as an unretrieved-task
                 # dump on stderr (item 3): surface it through the same channel as
