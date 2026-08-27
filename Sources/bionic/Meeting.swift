@@ -64,11 +64,20 @@ func runMeeting() async {
     }
 
     // A bare title is the whole point of the subcommand; the script wants --title.
+    // It can sit anywhere in the line, so skip past flags - and past the values of
+    // the two that take one - rather than only checking the first argument.
+    let valueFlags: Set<String> = ["--title", "--session"]
     var passthrough = args
     var scriptArgs = [script]
-    if let first = passthrough.first, !first.hasPrefix("-") {
-        scriptArgs += ["--title", first]
-        passthrough.removeFirst()
+    var i = 0
+    while i < passthrough.count {
+        let arg = passthrough[i]
+        if !arg.hasPrefix("-") {
+            scriptArgs += ["--title", arg]
+            passthrough.remove(at: i)
+            break
+        }
+        i += valueFlags.contains(arg) ? 2 : 1
     }
     scriptArgs += passthrough
 
