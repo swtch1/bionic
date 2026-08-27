@@ -1,0 +1,3 @@
+{"seq":1,"start":1000.00,"end":1004.70,"speaker":"other","text":"We don't need to touch the gateway for this - rate limiting is enforced in auth-service, not at the edge.","final":true,"conf":1.0}
+{"seq":2,"start":1005.20,"end":1009.40,"speaker":"other","text":"So if we raise the login limit we only ship one service and we're done by Thursday.","final":true,"conf":1.0}
+{"seq":3,"start":1010.00,"end":1011.30,"speaker":"me","text":"Okay, that sounds simple enough.","final":true,"conf":1.0}

@@ -1,7 +1,12 @@
 .build/
 .swiftpm/
+# Recordings and session transcripts - never committed. The two exceptions are
+# TEST INPUTS that only look like recordings: the diarizer's ground truth, and
+# the feedback app's replay fixtures. Both are authored by hand and both are
+# load-bearing for the test suite, which is why this rule silently ate them once.
 *.jsonl
 !testdata/*.jsonl
+!feedback/fixtures/*.jsonl
 voiceprint.json
 *.xcodeproj
 .DS_Store

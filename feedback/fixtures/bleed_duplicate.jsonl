@@ -1,0 +1,3 @@
+{"seq":1,"start":1000.00,"end":1004.60,"speaker":"other","text":"So the session token expires after thirty minutes of inactivity.","final":true,"conf":1.0}
+{"seq":2,"start":1000.31,"end":1004.55,"speaker":"me","text":"So the session token expires after thirty minutes of inactivity","final":true,"conf":1.0}
+{"seq":3,"start":1005.40,"end":1007.10,"speaker":"me","text":"Right, that matches what I remember.","final":true,"conf":1.0}

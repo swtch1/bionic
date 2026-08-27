@@ -1,0 +1,3 @@
+{"seq":1,"start":1000.00,"end":1005.90,"speaker":"other","text":"Quick one on auth-service. When a refresh token is reused after it's already been redeemed, does it revoke the whole session family or just reject that one call?","final":true,"conf":1.0}
+{"seq":2,"start":1006.30,"end":1010.10,"speaker":"other","text":"I ask because the mobile team is seeing users get logged out and nobody can tell me if that's the intended behaviour.","final":true,"conf":1.0}
+{"seq":3,"start":1010.80,"end":1013.60,"speaker":"me","text":"I think it just rejects the one call, but I'd have to check.","final":true,"conf":1.0}
